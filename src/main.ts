@@ -153,9 +153,12 @@ downloadButton.addEventListener('click', () => {
   const blob = new Blob([text], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const title = typeof result.title === 'string' && result.title.length > 0 ? result.title : 'corrected';
+  const filename =
+    typeof result.title === 'string' && result.title.length > 0
+      ? `${result.title}_corrected.ady`
+      : 'corrected.ady';
   a.href = url;
-  a.download = `${title}_corrected.ady`;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
 });
