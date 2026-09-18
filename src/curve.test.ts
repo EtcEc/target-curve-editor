@@ -54,6 +54,24 @@ describe('designGain', () => {
     const params: CurveParams = { slope: 6, shelfEnabled: true, shelfGain: 6 };
     expect(designGain(100, params)).toBeCloseTo(6.0, 2);
   });
+
+  it('does not produce NaN when slope is 0 and the shelf is enabled', () => {
+    const params: CurveParams = { slope: 0, shelfEnabled: true, shelfGain: 6 };
+    for (const freq of [20, 100, 500, 1000, 5000, 20000]) {
+      const result = designGain(freq, params);
+      expect(Number.isFinite(result)).toBe(true);
+      expect(result).toBeCloseTo(Math.min(tilt(freq, 0), params.shelfGain), 9);
+    }
+  });
+
+  it('degrades to Math.min(tilt, shelfGain) at slope 0 even with a negative shelfGain', () => {
+    const params: CurveParams = { slope: 0, shelfEnabled: true, shelfGain: -3 };
+    for (const freq of [20, 1000, 20000]) {
+      const result = designGain(freq, params);
+      expect(Number.isFinite(result)).toBe(true);
+      expect(result).toBeCloseTo(Math.min(tilt(freq, 0), params.shelfGain), 9);
+    }
+  });
 });
 
 describe('writtenGain', () => {

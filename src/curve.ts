@@ -43,6 +43,12 @@ function softmin(a: number, b: number, k: number): number {
 export function designGain(freq: number, params: CurveParams): number {
   const t = tilt(freq, params.slope);
   if (!params.shelfEnabled) return t;
+  if (params.slope === 0) {
+    // No tilt to smoothly cap: 2/(0 * knee) is undefined and would blow up
+    // softmin into NaN. This is exactly the value softmin approaches in the
+    // limit as the transition sharpens, so it's a faithful degenerate case.
+    return Math.min(t, params.shelfGain);
+  }
   const k = 2 / (params.slope * SHELF_KNEE_OCTAVES);
   return softmin(t, params.shelfGain, k);
 }
