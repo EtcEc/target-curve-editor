@@ -3,3 +3,12 @@ __pycache__/
 
 # personal calibration files — real room measurement data, keep out of the public repo
 *.ady
+
+node_modules/
+dist/
+*.tsbuildinfo
+
+# tsc -b has no outDir configured, so it emits compiled JS next to the
+# TypeScript sources in src/ -- this project is TS-only, so any .js there
+# is always a stray build byproduct, never a real source file.
+src/**/*.js
