@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { tilt, frequencyGrid, designGain, type CurveParams } from './curve';
+import { tilt, frequencyGrid, designGain, writtenGain, computeTrimShift, type CurveParams } from './curve';
+import { hfKneeGain } from './hfKnee';
 
 describe('tilt', () => {
   it('is 0dB at the 1kHz pivot regardless of slope', () => {
@@ -52,5 +53,38 @@ describe('designGain', () => {
   it('asymptotically approaches shelfGain well below the crossing frequency', () => {
     const params: CurveParams = { slope: 6, shelfEnabled: true, shelfGain: 6 };
     expect(designGain(100, params)).toBeCloseTo(6.0, 2);
+  });
+});
+
+describe('writtenGain', () => {
+  it('equals designGain minus the HF knee at a point where the knee is non-zero', () => {
+    const params: CurveParams = { slope: 3, shelfEnabled: false, shelfGain: 0 };
+    const expected = designGain(10000, params) - hfKneeGain(10000);
+    expect(writtenGain(10000, params)).toBeCloseTo(expected, 9);
+  });
+
+  it('is unaffected by the HF knee well below the knee (100Hz)', () => {
+    const params: CurveParams = { slope: 3, shelfEnabled: false, shelfGain: 0 };
+    expect(writtenGain(100, params)).toBeCloseTo(designGain(100, params), 3);
+  });
+});
+
+describe('computeTrimShift', () => {
+  it('is the writtenGain value at 20Hz for a positive-slope, shelf-disabled curve', () => {
+    // the curve is monotonically decreasing with frequency in this case, so the
+    // max over the grid is at its lowest point, 20Hz
+    const params: CurveParams = { slope: 6, shelfEnabled: false, shelfGain: 0 };
+    const expected = writtenGain(20, params);
+    expect(computeTrimShift(params)).toBeCloseTo(expected, 6);
+  });
+
+  it('is close to shelfGain when the shelf is enabled and caps the bass boost', () => {
+    const params: CurveParams = { slope: 6, shelfEnabled: true, shelfGain: 6 };
+    expect(computeTrimShift(params)).toBeCloseTo(6, 2);
+  });
+
+  it('equals the negative of the HF knee minimum when slope is 0 (flat design, pure knee cancellation)', () => {
+    const params: CurveParams = { slope: 0, shelfEnabled: false, shelfGain: 0 };
+    expect(computeTrimShift(params)).toBeCloseTo(5.9444, 3);
   });
 });

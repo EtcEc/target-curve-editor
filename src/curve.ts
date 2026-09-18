@@ -1,3 +1,5 @@
+import { hfKneeGain } from './hfKnee';
+
 const PIVOT_FREQ = 1000;
 
 /** Down-tilt gain in dB at `freq`, `slope` dB/octave, 0dB at 1kHz. */
@@ -43,4 +45,28 @@ export function designGain(freq: number, params: CurveParams): number {
   if (!params.shelfEnabled) return t;
   const k = 2 / (params.slope * SHELF_KNEE_OCTAVES);
   return softmin(t, params.shelfGain, k);
+}
+
+/**
+ * The curve actually written to the .ady file: the designed curve with
+ * Audyssey's fixed HF-knee rolloff pre-cancelled, so what you designed is
+ * what you actually get after Audyssey applies its own knee on top.
+ */
+export function writtenGain(freq: number, params: CurveParams): number {
+  return designGain(freq, params) - hfKneeGain(freq);
+}
+
+/**
+ * The amount Audyssey will shift a subwoofer's curve down to normalize its
+ * max to 0dB -- and therefore the trim boost needed to restore the
+ * absolute level you designed.
+ */
+export function computeTrimShift(params: CurveParams): number {
+  const grid = frequencyGrid();
+  let max = -Infinity;
+  for (const f of grid) {
+    const g = writtenGain(f, params);
+    if (g > max) max = g;
+  }
+  return max;
 }
