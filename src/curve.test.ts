@@ -112,6 +112,6 @@ describe('computeTrimShift', () => {
 
   it('equals the negative of the HF knee minimum when slope is 0 (flat design, pure knee cancellation)', () => {
     const params: CurveParams = { slope: 0, shelfEnabled: false, shelfGain: 0 };
-    expect(computeTrimShift(params)).toBeCloseTo(5.9444, 3);
+    expect(computeTrimShift(params)).toBeCloseTo(6.1328, 3);
   });
 });

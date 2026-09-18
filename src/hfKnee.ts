@@ -1,27 +1,38 @@
+import hfKneeData from './hfKneeData.json';
+
 /**
  * Audyssey MultEQ's default HF double-knee rolloff (enTargetCurveType === 2),
- * fitted once from a reference target-curve screenshot. See
- * docs/superpowers/specs/2026-09-18-target-curve-editor-design.md for
- * derivation. Ported from hf_knee.py.
- *
- * gain(f) = G1 * r1/(1+r1) + G2 * r2/(1+r2),  ri = (f / f0i) ** ni
- * Fit quality against the extracted curve: RMS 0.032 dB, max error 0.16 dB.
+ * extracted once from a reference target-curve screenshot -- see
+ * docs/superpowers/specs/2026-09-18-target-curve-editor-design.md for how
+ * this was captured. Interpolated directly from the raw extracted points
+ * (log-frequency linear interpolation, matching the original Python
+ * script's np.interp technique exactly) rather than approximating them
+ * with a fitted formula -- a fitted curve introduced a small but real
+ * residual against Audyssey's actual applied shape that this avoids.
  */
 
-const G1 = -2.9865;
-const F01 = 6352.62;
-const N1 = 6.4001;
-
-const G2 = -5.0943;
-const F02 = 18176.89;
-const N2 = 3.4201;
-
-function shelf(freq: number, gain: number, f0: number, n: number): number {
-  const ratio = (freq / f0) ** n;
-  return (gain * ratio) / (1 + ratio);
-}
+const FREQUENCIES: number[] = hfKneeData.frequency;
+const GAINS: number[] = hfKneeData.gain;
+const LOG_FREQUENCIES: number[] = FREQUENCIES.map((f) => Math.log10(f));
 
 /** dB gain of Audyssey's default HF double-knee rolloff at `freq` (Hz). */
 export function hfKneeGain(freq: number): number {
-  return shelf(freq, G1, F01, N1) + shelf(freq, G2, F02, N2);
+  const logFreq = Math.log10(freq);
+  const first = 0;
+  const last = LOG_FREQUENCIES.length - 1;
+
+  if (logFreq <= LOG_FREQUENCIES[first]) return GAINS[first];
+  if (logFreq >= LOG_FREQUENCIES[last]) return GAINS[last];
+
+  let lo = first;
+  let hi = last;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (LOG_FREQUENCIES[mid] <= logFreq) lo = mid;
+    else hi = mid;
+  }
+
+  const span = LOG_FREQUENCIES[hi] - LOG_FREQUENCIES[lo];
+  const t = span === 0 ? 0 : (logFreq - LOG_FREQUENCIES[lo]) / span;
+  return GAINS[lo] + t * (GAINS[hi] - GAINS[lo]);
 }

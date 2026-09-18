@@ -11,8 +11,9 @@ and the subwoofer-only level renormalization it performs).
 
 This replaces the existing Python scripts (`create_correction.py`,
 `create_correction_shelved.py`, the per-channel image-reading workflow)
-entirely. The one artifact carried forward from that work is the fitted
-HF-knee model (`hf_knee.py` → ported to `hfKnee.ts`).
+entirely. The one artifact carried forward from that work is the
+extracted HF-knee reference data (`hfKneeData.json`, interpolated
+directly by `hfKnee.ts`).
 
 ## Background (established this session)
 
@@ -31,15 +32,17 @@ HF-knee model (`hf_knee.py` → ported to `hfKnee.ts`).
   whatever `customTargetCurvePoints` you provide (confirmed for
   `enTargetCurveType == 2`; a second, different rolloff shape exists for
   another `enTargetCurveType` value, not modeled here). This was extracted
-  from a reference screenshot and fitted to:
-
-  ```
-  hfKneeGain(f) = G1*(f/f01)^n1/(1+(f/f01)^n1) + G2*(f/f02)^n2/(1+(f/f02)^n2)
-  G1=-2.9865  f01=6352.62  n1=6.4001
-  G2=-5.0943  f02=18176.89 n2=3.4201
-  ```
-  Fit quality against the extracted reference curve: RMS 0.032dB, max error
-  0.16dB. (Currently lives in `hf_knee.py`; ported to TS as `hfKnee.ts`.)
+  from a reference screenshot as ~2000 raw (frequency, gain) pixel-derived
+  points and is interpolated directly (log-frequency linear interpolation,
+  matching the original Python script's `np.interp` technique) rather than
+  fitted to a formula. A 6-parameter double-shelf-sigmoid fit was tried
+  first (RMS 0.032dB / max 0.16dB against the extracted points) but was
+  abandoned: importing a corrected `.ady` and inspecting the resulting
+  curve in MultEQ's own Curve Editor showed a smooth, systematically
+  growing residual (~0.7dB by 20kHz) that direct point interpolation
+  (which is what the old, known-good Python script always did) doesn't
+  produce. The raw points live in `hfKneeData.json` (repo root of `src/`);
+  `hfKnee.ts` interpolates them directly.
 - For the **subwoofer channel(s) only**, Audyssey renormalizes the custom
   curve so its max value sits at 0dB before applying it (turning it into a
   cuts-only curve), and does *not* do this for any other channel type.
@@ -75,7 +78,8 @@ Modules:
   (locate subwoofer channels by `commandId` prefix `"SW"`).
 - `curve.ts` — pure math: tilt, smooth shelf crossfade, combination with the
   HF-knee inverse, subwoofer trim computation.
-- `hfKnee.ts` — fitted HF-knee constants/function, ported from `hf_knee.py`.
+- `hfKnee.ts` — interpolates the extracted HF-knee reference points
+  (`hfKneeData.json`) directly; no fitted formula.
 - `chart.ts` — thin wrapper around a small charting lib (uPlot) for the
   live preview.
 - `ui.ts` / `main.ts` — file drop zone, parameter controls, live chart,
