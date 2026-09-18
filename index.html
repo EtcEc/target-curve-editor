@@ -4,9 +4,58 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Audyssey Target Curve Editor</title>
+    <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <h1>Audyssey Target Curve Editor</h1>
+
+      <section id="dropzone">
+        <p>Drag and drop a .ady file here, or click to choose one.</p>
+        <input type="file" id="file-input" accept=".ady" />
+      </section>
+
+      <p id="error-message" class="error" hidden></p>
+
+      <section id="editor" hidden>
+        <div id="controls">
+          <label>
+            Slope (dB/octave)
+            <input type="range" id="slope" min="0" max="10" step="0.1" value="3" />
+            <input type="number" id="slope-number" min="0" max="10" step="0.1" value="3" />
+          </label>
+
+          <label>
+            <input type="checkbox" id="shelf-enabled" />
+            Bass shelf
+          </label>
+
+          <label>
+            Shelf gain (dB)
+            <input type="range" id="shelf-gain" min="-6" max="12" step="0.5" value="6" disabled />
+            <input type="number" id="shelf-gain-number" min="-6" max="12" step="0.5" value="6" disabled />
+          </label>
+        </div>
+
+        <div id="chart"></div>
+
+        <table id="channel-summary">
+          <thead>
+            <tr>
+              <th>Channel</th>
+              <th>Role</th>
+              <th>Trim shift (dB)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p id="no-subwoofer-warning" class="warning" hidden>
+          No subwoofer channel detected — trim compensation was skipped.
+        </p>
+
+        <button id="download">Download corrected .ady</button>
+      </section>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

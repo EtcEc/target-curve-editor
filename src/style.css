@@ -1,0 +1,52 @@
+body {
+  font-family: system-ui, sans-serif;
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  background: #111;
+  color: #eee;
+}
+
+#dropzone {
+  border: 2px dashed #555;
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.error {
+  color: #f66;
+  font-weight: bold;
+}
+
+.warning {
+  color: #fc6;
+}
+
+#controls label {
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+#chart {
+  margin: 1rem 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid #333;
+}
+
+button {
+  font-size: 1rem;
+  padding: 0.5rem 1rem;
+}
