@@ -28,7 +28,7 @@ export function createChart(container: HTMLElement, params: CurveParams): uPlot 
     width: container.clientWidth || 800,
     height: 400,
     scales: {
-      x: { distr: 3, min: 20, max: 20000 },
+      x: { time: false, distr: 3, min: 20, max: 20000 },
       y: { range: [-30, 20] },
     },
     axes: [{ label: 'Frequency (Hz)' }, { label: 'Gain (dB)' }],
