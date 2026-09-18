@@ -31,7 +31,10 @@ export function createChart(container: HTMLElement, params: CurveParams): uPlot 
       x: { time: false, distr: 3, min: 20, max: 20000 },
       y: { range: [-30, 20] },
     },
-    axes: [{ label: 'Frequency (Hz)' }, { label: 'Gain (dB)' }],
+    axes: [
+      { label: 'Frequency (Hz)', stroke: '#ccc', grid: { stroke: '#333' } },
+      { label: 'Gain (dB)', stroke: '#ccc', grid: { stroke: '#333' } },
+    ],
     series: [{}, { label: 'Target Curve', stroke: '#e33', width: 2 }],
   };
   return new uPlot(opts, designCurveData(params) as uPlot.AlignedData, container);
