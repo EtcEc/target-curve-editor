@@ -13,9 +13,9 @@ let currentAdy: AdyFile | null = null;
 let chart: ReturnType<typeof createChart> | null = null;
 
 const params: CurveParams = {
-  slope: 3,
-  shelfEnabled: false,
-  shelfGain: 6,
+  slope: 0.7,
+  shelfEnabled: true,
+  shelfGain: 4.5,
 };
 
 const dropzone = document.getElementById('dropzone') as HTMLElement;

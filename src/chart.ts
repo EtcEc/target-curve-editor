@@ -28,8 +28,8 @@ export function createChart(container: HTMLElement, params: CurveParams): uPlot 
     width: container.clientWidth || 800,
     height: 400,
     scales: {
-      x: { time: false, distr: 3, min: 20, max: 20000 },
-      y: { range: [-30, 20] },
+      x: { time: false, distr: 3, range: [20, 20000] },
+      y: { range: [-15, 15] },
     },
     axes: [
       { label: 'Frequency (Hz)', stroke: '#ccc', grid: { stroke: '#333' } },
