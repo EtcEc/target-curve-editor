@@ -1,0 +1,26 @@
+[project]
+name = "target-curve"
+version = "0.1.0"
+description = "Modifies Audyssey calibration files with my favorite target curve."
+authors = [
+    {name = "Esben Toke Christensen",email = "esben.christensen@visma.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "numpy (>=2.0.0,<2.3.0)",
+    "opencv-python (>=4.12.0.88,<5.0.0.0)",
+    "pandas (>=2.3.3,<3.0.0)",
+    "matplotlib (>=3.10.7,<4.0.0)"
+]
+
+
+[tool.poetry]
+package-mode = false
+
+[tool.uv]
+package = false
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

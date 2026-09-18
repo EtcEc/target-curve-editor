@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+
+# personal calibration files — real room measurement data, keep out of the public repo
+*.ady

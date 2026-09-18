@@ -1,0 +1,184 @@
+# Target Curve Editor — Design
+
+## Purpose
+
+A GitHub Pages web app: drop in an Audyssey MultEQ `.ady` calibration file,
+design a target curve (down-tilt + optional bass shelf), and download a
+modified `.ady` with that curve applied to every channel — replacing
+Audyssey's default reference curve while correctly compensating for
+Audyssey's own fixed behaviors (the HF double-knee it always layers on top,
+and the subwoofer-only level renormalization it performs).
+
+This replaces the existing Python scripts (`create_correction.py`,
+`create_correction_shelved.py`, the per-channel image-reading workflow)
+entirely. The one artifact carried forward from that work is the fitted
+HF-knee model (`hf_knee.py` → ported to `hfKnee.ts`).
+
+## Background (established this session)
+
+- `.ady` files are JSON. Each entry in `detectedChannels[]` is one speaker
+  channel, identified by `commandId` (e.g. `FL`, `C`, `SW1`). Subwoofer
+  channel(s) are identified by `commandId` starting with `"SW"` — there can
+  be more than one, and the channel *count and indices are not fixed*
+  (observed: 10 channels, indices 0–9, sub at index 9 — do not assume a
+  fixed layout or count).
+- `enTargetCurveType` (top-level) selects which fixed HF rolloff shape
+  Audyssey applies on top of any custom curve. This project only models
+  one such shape (see below); the app must force this field to the
+  matching value (`2`) in its output regardless of the input value, or the
+  HF-knee cancellation below is invalid.
+- Audyssey applies a static, always-on HF "double knee" rolloff on top of
+  whatever `customTargetCurvePoints` you provide (confirmed for
+  `enTargetCurveType == 2`; a second, different rolloff shape exists for
+  another `enTargetCurveType` value, not modeled here). This was extracted
+  from a reference screenshot and fitted to:
+
+  ```
+  hfKneeGain(f) = G1*(f/f01)^n1/(1+(f/f01)^n1) + G2*(f/f02)^n2/(1+(f/f02)^n2)
+  G1=-2.9865  f01=6352.62  n1=6.4001
+  G2=-5.0943  f02=18176.89 n2=3.4201
+  ```
+  Fit quality against the extracted reference curve: RMS 0.032dB, max error
+  0.16dB. (Currently lives in `hf_knee.py`; ported to TS as `hfKnee.ts`.)
+- For the **subwoofer channel(s) only**, Audyssey renormalizes the custom
+  curve so its max value sits at 0dB before applying it (turning it into a
+  cuts-only curve), and does *not* do this for any other channel type.
+  To get the intended absolute level back, the app must compute that shift
+  and add it to the subwoofer's `trimAdjustment`.
+- Corrections are intentionally scoped to what the target-curve definition
+  controls (tilt/shelf shape + the HF-knee cancellation). Audyssey's own
+  measurement-based room correction still does the actual per-channel,
+  per-room EQ work to try to hit the specified target — this app does not
+  attempt to predict or cancel that.
+
+## Non-goals (v1)
+
+- The second HF-rolloff shape (different `enTargetCurveType`) — out of
+  scope, not extracted or modeled.
+- The ~2kHz midrange-compensation dip (`midrangeCompensation` per-channel
+  flag) — a separate, independent option; not modeled or toggled by this
+  app.
+- Any server component, file storage, or analytics — fully static,
+  fully client-side.
+- Automated UI/e2e testing — manual browser verification is sufficient
+  for this scope.
+
+## Architecture
+
+Static single-page app: **TypeScript + Vite, no UI framework**. Built
+`dist/` published to GitHub Pages via a GitHub Actions workflow on push to
+the default branch. Repo is public (required for free GH Pages hosting).
+
+Modules:
+
+- `ady.ts` — parse/validate/serialize `.ady` JSON; channel introspection
+  (locate subwoofer channels by `commandId` prefix `"SW"`).
+- `curve.ts` — pure math: tilt, smooth shelf-cap, combination with the
+  HF-knee inverse, subwoofer trim computation.
+- `hfKnee.ts` — fitted HF-knee constants/function, ported from `hf_knee.py`.
+- `chart.ts` — thin wrapper around a small charting lib (uPlot) for the
+  live preview.
+- `ui.ts` / `main.ts` — file drop zone, parameter controls, live chart,
+  channel summary, download button.
+
+## Curve math
+
+```
+tilt(f)     = slope * log2(1000 / f)                          # dB, slope in dB/octave
+                                                                # 0dB at 1kHz (fixed pivot)
+                                                                # positive slope: boost toward
+                                                                # bass, cut toward treble
+
+# bass shelf (optional, toggled on/off):
+#   caps the tilt's boost at shelfGain dB as frequency decreases,
+#   with a smooth (not sharp-cornered) transition.
+shelfPivot: the frequency where tilt(f) == shelfGain, i.e. f = 1000 * 2^(-shelfGain/slope)
+softmin(a, b, k) = -1/k * log(exp(-k*a) + exp(-k*b))           # smooth minimum
+                                                                # k = fixed constant (not user-exposed),
+                                                                # tuned once for a sensible knee width
+
+design(f)   = softmin(tilt(f), shelfGain, k)   if shelf enabled
+            = tilt(f)                          if shelf disabled
+
+written(f)  = design(f) - hfKneeGain(f)        # pre-cancels Audyssey's fixed HF knee
+```
+
+`design(f)` is what the live chart plots (what you'll actually hear).
+`written(f)` is what actually goes into the file.
+
+Frequency grid: same as the old scripts — 1Hz steps 20–200Hz, 10Hz steps
+200–20000Hz.
+
+## Output file changes
+
+For every channel in `detectedChannels[]`:
+
+- `customTargetCurvePoints` = `written(f)` sampled on the frequency grid
+  above, formatted as `"{freq, gain}"` strings (matching existing format).
+
+For channels whose `commandId` starts with `"SW"` only:
+
+- `trimShift = max(written(f))` over the frequency grid
+- `trimAdjustment` = original value + `trimShift` (as a string, same
+  format/precision as the source field)
+
+Top-level:
+
+- `enTargetCurveType` = `2` (forced, regardless of input value)
+
+Everything else in the file (`responseData`, `delayAdjustment`,
+`channelReport`, `customCrossover`, etc.) is passed through unmodified.
+
+## UI & data flow
+
+1. **Drop zone** (drag-and-drop or file picker). On load: `JSON.parse`,
+   then validate shape — `detectedChannels` is a non-empty array, each
+   entry has `commandId`, `customTargetCurvePoints`, `trimAdjustment`;
+   top-level has `enTargetCurveType`. Invalid → clear error message, no
+   further UI.
+2. **Controls** (shown once a valid file is loaded):
+   - Slope (dB/octave): number input + slider
+   - Bass shelf: on/off toggle; when on, a Shelf Gain (dB) input
+3. **Live chart**: updates on every control change, plots `design(f)`.
+   Log X-axis 20Hz–20kHz, dB Y-axis, styled similar to the Audyssey app's
+   own graphs.
+4. **Channel summary**: table of detected channels, flags which are
+   treated as subwoofers, shows the computed trim shift. If zero
+   subwoofer channels are detected, show a visible warning (processing
+   still proceeds — trim step is simply skipped).
+5. **Download button**: serializes the modified JSON, triggers a browser
+   download named `<title>_corrected.ady` (falling back to
+   `corrected.ady` if `title` is missing).
+
+Nothing is ever sent off the device — all parsing, computation, and file
+generation happens in-browser.
+
+## Error handling
+
+- Invalid JSON / missing required fields on upload → block with a clear
+  message; no partial processing.
+- No subwoofer channel detected → proceed, but show a visible warning
+  (see UI section).
+- No clamping of user-entered slope/shelf values — the live chart is the
+  guardrail against nonsensical designs, not input validation.
+
+## Testing
+
+- `curve.ts`: unit tests for `tilt`, `softmin`, the tilt+shelf
+  combination, the HF-knee-inverse subtraction, and the trim
+  calculation — pure, deterministic functions, written test-first.
+- `hfKnee.ts`: a test asserting the reference points fitted this session
+  (e.g. gain ≈ 0 at 1kHz, gain ≈ -6.1dB at 20kHz) so a future refit can't
+  silently drift.
+- `ady.ts`: parsing/validation/serialization tests against a **synthetic
+  fixture** — a small hand-built fake `.ady` with a few channels
+  (including one `SW1`) and minimal dummy `responseData` arrays. The
+  real `Default.ady` in this repo is personal calibration data and is
+  gitignored (`*.ady`); it must never be used as a committed test
+  fixture.
+- No automated UI/e2e tests for v1; manual browser verification.
+
+## Open items carried into implementation planning
+
+None — all sections above were reviewed and approved section-by-section
+during design.
