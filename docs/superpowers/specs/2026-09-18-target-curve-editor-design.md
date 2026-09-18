@@ -73,7 +73,7 @@ Modules:
 
 - `ady.ts` — parse/validate/serialize `.ady` JSON; channel introspection
   (locate subwoofer channels by `commandId` prefix `"SW"`).
-- `curve.ts` — pure math: tilt, smooth shelf-cap, combination with the
+- `curve.ts` — pure math: tilt, smooth shelf crossfade, combination with the
   HF-knee inverse, subwoofer trim computation.
 - `hfKnee.ts` — fitted HF-knee constants/function, ported from `hf_knee.py`.
 - `chart.ts` — thin wrapper around a small charting lib (uPlot) for the
@@ -90,18 +90,38 @@ tilt(f)     = slope * log2(1000 / f)                          # dB, slope in dB/
                                                                 # bass, cut toward treble
 
 # bass shelf (optional, toggled on/off):
-#   caps the tilt's boost at shelfGain dB as frequency decreases,
-#   with a smooth (not sharp-cornered) transition.
-shelfPivot: the frequency where tilt(f) == shelfGain, i.e. f = 1000 * 2^(-shelfGain/slope)
-softmin(a, b, k) = -1/k * log(exp(-k*a) + exp(-k*b))           # smooth minimum
-                                                                # k = fixed constant (not user-exposed),
-                                                                # tuned once for a sensible knee width
+#   a flat plateau at shelfGain dB below ~40Hz, crossfading smoothly
+#   into the plain tilt by ~100Hz. This is NOT additive (tilt + shelf)
+#   and NOT a cap on the tilt (min(tilt, shelfGain)) -- both of those
+#   were tried and rejected: additive double-stacks in the transition
+#   band, and a cap can never exceed what the tilt alone would give,
+#   so gentle slopes (e.g. 0.7 dB/oct) never reach the shelf value at
+#   all. This is a genuine crossfade between two curves.
+SHELF_LOW_FREQ = 40    # Hz, fixed constant, not user-exposed
+SHELF_HIGH_FREQ = 100  # Hz, fixed constant, not user-exposed
+smoothstep(t) = clamp(t, 0, 1)^2 * (3 - 2*clamp(t, 0, 1))       # 0->1 ease, zero slope at both ends
 
-design(f)   = softmin(tilt(f), shelfGain, k)   if shelf enabled
-            = tilt(f)                          if shelf disabled
+weight(f) = smoothstep((log2(f) - log2(SHELF_LOW_FREQ)) / (log2(SHELF_HIGH_FREQ) - log2(SHELF_LOW_FREQ)))
+
+design(f)   = shelfGain*(1 - weight(f)) + tilt(f)*weight(f)   if shelf enabled
+            = tilt(f)                                         if shelf disabled
 
 written(f)  = design(f) - hfKneeGain(f)        # pre-cancels Audyssey's fixed HF knee
 ```
+
+At `f <= 40Hz`, `design(f) === shelfGain` exactly (weight is 0). At `f >= 100Hz`,
+`design(f) === tilt(f)` exactly (weight is 1) -- the shelf has zero influence
+on the mids/treble or the HF-knee cancellation. At `slope = 0` this reproduces
+a literal reference shelf shape: flat `shelfGain` below 40Hz, flat 0dB from
+100Hz up to 20kHz.
+
+Known limitation, not addressed: for a slope steep enough that `tilt(f)` at
+the 40-100Hz breakpoints already exceeds `shelfGain`, the crossfade produces
+a non-monotonic bump (the curve dips to `shelfGain` below 40Hz, rises above
+it through the transition band, then continues following the steeper tilt).
+This doesn't affect the intended use case (a gentle tilt with a shelf adding
+extra bass beyond what the tilt alone provides) and wasn't flagged as a
+requirement to fix.
 
 `design(f)` is what the live chart plots (what you'll actually hear).
 `written(f)` is what actually goes into the file.

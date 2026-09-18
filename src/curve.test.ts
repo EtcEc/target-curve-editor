@@ -38,38 +38,47 @@ describe('designGain', () => {
     expect(designGain(300, params)).toBeCloseTo(tilt(300, 4), 9);
   });
 
-  it('is close to 0dB at the pivot, barely nudged by a shelf far below it', () => {
-    // slope=6, shelfGain=6 -> tilt(f)=shelfGain at f=500Hz, well below the 1kHz pivot
-    const params: CurveParams = { slope: 6, shelfEnabled: true, shelfGain: 6 };
-    expect(designGain(1000, params)).toBeCloseTo(-0.0272, 3);
+  it('equals shelfGain exactly at and below 40Hz', () => {
+    const params: CurveParams = { slope: 0.7, shelfEnabled: true, shelfGain: 6 };
+    expect(designGain(40, params)).toBeCloseTo(6, 9);
+    expect(designGain(20, params)).toBeCloseTo(6, 9);
   });
 
-  it('sits slightly below shelfGain right at the tilt/shelf crossing frequency', () => {
-    // tilt(500, 6) === 6 === shelfGain, so this is exactly the crossing point
-    const params: CurveParams = { slope: 6, shelfEnabled: true, shelfGain: 6 };
-    expect(designGain(500, params)).toBeCloseTo(4.9603, 3);
+  it('equals tilt exactly at and above 100Hz (shelf has no influence there)', () => {
+    const params: CurveParams = { slope: 0.7, shelfEnabled: true, shelfGain: 6 };
+    expect(designGain(100, params)).toBeCloseTo(tilt(100, 0.7), 9);
+    expect(designGain(200, params)).toBeCloseTo(tilt(200, 0.7), 9);
   });
 
-  it('asymptotically approaches shelfGain well below the crossing frequency', () => {
-    const params: CurveParams = { slope: 6, shelfEnabled: true, shelfGain: 6 };
-    expect(designGain(100, params)).toBeCloseTo(6.0, 2);
+  it('actually boosts the low end for a gentle slope (the reported bug)', () => {
+    // at slope=0.7 the tilt alone only reaches ~3.95dB by 20Hz -- nowhere
+    // near a 6dB shelf. The crossfade must still deliver the full 6dB
+    // at/below 40Hz regardless of how gentle the slope is.
+    const params: CurveParams = { slope: 0.7, shelfEnabled: true, shelfGain: 6 };
+    expect(tilt(20, 0.7)).toBeLessThan(4);
+    expect(designGain(20, params)).toBeCloseTo(6, 9);
   });
 
-  it('does not produce NaN when slope is 0 and the shelf is enabled', () => {
+  it('blends exactly halfway at the log-frequency midpoint between 40Hz and 100Hz', () => {
+    // smoothstep(0.5) === 0.5, so the geometric mean of the two breakpoints
+    // is where the blend is a plain 50/50 average of shelfGain and tilt(f)
+    const params: CurveParams = { slope: 3, shelfEnabled: true, shelfGain: 6 };
+    const midFreq = Math.sqrt(40 * 100);
+    const expected = (params.shelfGain + tilt(midFreq, params.slope)) / 2;
+    expect(designGain(midFreq, params)).toBeCloseTo(expected, 6);
+  });
+
+  it('matches the reference shape exactly at slope=0: flat shelfGain below 40Hz, flat 0dB above 100Hz', () => {
     const params: CurveParams = { slope: 0, shelfEnabled: true, shelfGain: 6 };
-    for (const freq of [20, 100, 500, 1000, 5000, 20000]) {
-      const result = designGain(freq, params);
-      expect(Number.isFinite(result)).toBe(true);
-      expect(result).toBeCloseTo(Math.min(tilt(freq, 0), params.shelfGain), 9);
-    }
+    expect(designGain(20, params)).toBeCloseTo(6, 9);
+    expect(designGain(100, params)).toBeCloseTo(0, 9);
+    expect(designGain(20000, params)).toBeCloseTo(0, 9);
   });
 
-  it('degrades to Math.min(tilt, shelfGain) at slope 0 even with a negative shelfGain', () => {
-    const params: CurveParams = { slope: 0, shelfEnabled: true, shelfGain: -3 };
-    for (const freq of [20, 1000, 20000]) {
-      const result = designGain(freq, params);
-      expect(Number.isFinite(result)).toBe(true);
-      expect(result).toBeCloseTo(Math.min(tilt(freq, 0), params.shelfGain), 9);
+  it('never produces NaN, including at slope=0', () => {
+    const params: CurveParams = { slope: 0, shelfEnabled: true, shelfGain: 6 };
+    for (const freq of [20, 40, 63, 100, 1000, 20000]) {
+      expect(Number.isFinite(designGain(freq, params))).toBe(true);
     }
   });
 });
@@ -96,8 +105,8 @@ describe('computeTrimShift', () => {
     expect(computeTrimShift(params)).toBeCloseTo(expected, 6);
   });
 
-  it('is close to shelfGain when the shelf is enabled and caps the bass boost', () => {
-    const params: CurveParams = { slope: 6, shelfEnabled: true, shelfGain: 6 };
+  it('is close to shelfGain for a gentle slope where the shelf plateau is the peak of the curve', () => {
+    const params: CurveParams = { slope: 0.7, shelfEnabled: true, shelfGain: 6 };
     expect(computeTrimShift(params)).toBeCloseTo(6, 2);
   });
 

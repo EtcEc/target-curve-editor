@@ -19,38 +19,43 @@ export function frequencyGrid(): number[] {
   return grid;
 }
 
-/** Fixed knee-width (octaves) for the smooth tilt->shelf transition. Not user-exposed. */
-const SHELF_KNEE_OCTAVES = 0.5;
+/**
+ * Fixed breakpoints (Hz) for the shelf<->tilt crossfade. Not user-exposed:
+ * below SHELF_LOW_FREQ the curve sits flat at shelfGain; at/above
+ * SHELF_HIGH_FREQ it's pure tilt, unaffected by the shelf.
+ */
+const SHELF_LOW_FREQ = 40;
+const SHELF_HIGH_FREQ = 100;
 
 export interface CurveParams {
   /** dB/octave. Positive tilts down toward treble, up toward bass. */
   slope: number;
   shelfEnabled: boolean;
-  /** dB ceiling the bass shelf caps the tilt at. Only used when shelfEnabled. */
+  /** Flat plateau gain (dB) the curve sits at below ~40Hz. Only used when shelfEnabled. */
   shelfGain: number;
 }
 
-function softmin(a: number, b: number, k: number): number {
-  return (-1 / k) * Math.log(Math.exp(-k * a) + Math.exp(-k * b));
+/** Smooth 0->1 ease with zero slope at both ends. */
+function smoothstep(t: number): number {
+  const clamped = Math.min(1, Math.max(0, t));
+  return clamped * clamped * (3 - 2 * clamped);
 }
 
 /**
- * The curve you're designing: down-tilt, optionally capped by a smooth
- * bass shelf. This is what the live preview chart plots. Assumes a
- * positive slope when the shelf is enabled (a shelf only makes sense as a
- * cap on a rising-toward-bass tilt).
+ * The curve you're designing: down-tilt, optionally crossfading into a flat
+ * bass shelf below ~40Hz. This is what the live preview chart plots. Below
+ * SHELF_LOW_FREQ the result is exactly shelfGain; at/above SHELF_HIGH_FREQ
+ * it's exactly tilt(freq, slope) -- the shelf has no influence on the rest
+ * of the curve, including the HF-knee cancellation region.
  */
 export function designGain(freq: number, params: CurveParams): number {
   const t = tilt(freq, params.slope);
   if (!params.shelfEnabled) return t;
-  if (params.slope === 0) {
-    // No tilt to smoothly cap: 2/(0 * knee) is undefined and would blow up
-    // softmin into NaN. This is exactly the value softmin approaches in the
-    // limit as the transition sharpens, so it's a faithful degenerate case.
-    return Math.min(t, params.shelfGain);
-  }
-  const k = 2 / (params.slope * SHELF_KNEE_OCTAVES);
-  return softmin(t, params.shelfGain, k);
+  const x =
+    (Math.log2(freq) - Math.log2(SHELF_LOW_FREQ)) /
+    (Math.log2(SHELF_HIGH_FREQ) - Math.log2(SHELF_LOW_FREQ));
+  const weight = smoothstep(x);
+  return params.shelfGain * (1 - weight) + t * weight;
 }
 
 /**
