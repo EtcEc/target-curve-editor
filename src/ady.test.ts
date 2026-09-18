@@ -50,3 +50,52 @@ describe('isSubwooferChannel', () => {
     expect(isSubwooferChannel(ady.detectedChannels[0])).toBe(false);
   });
 });
+
+import { applyCurveToAdy, serializeAdy } from './ady';
+import { computeTrimShift, frequencyGrid, type CurveParams } from './curve';
+
+describe('applyCurveToAdy', () => {
+  const params: CurveParams = { slope: 3, shelfEnabled: false, shelfGain: 0 };
+
+  it('writes the same customTargetCurvePoints to every channel', () => {
+    const result = applyCurveToAdy(createSampleAdy(), params);
+    expect(result.detectedChannels[0].customTargetCurvePoints).toEqual(
+      result.detectedChannels[1].customTargetCurvePoints
+    );
+    expect(result.detectedChannels[0].customTargetCurvePoints.length).toBe(frequencyGrid().length);
+  });
+
+  it('adds the trim shift only to the subwoofer channel', () => {
+    const result = applyCurveToAdy(createSampleAdy(), params);
+    const trimShift = computeTrimShift(params);
+    expect(parseFloat(result.detectedChannels[1].trimAdjustment)).toBeCloseTo(-1.25 + trimShift, 5);
+    expect(result.detectedChannels[0].trimAdjustment).toBe('0.500000');
+  });
+
+  it('forces enTargetCurveType to 2', () => {
+    const result = applyCurveToAdy(createSampleAdy(), params);
+    expect(result.enTargetCurveType).toBe(2);
+  });
+
+  it('does not mutate the input', () => {
+    const input = createSampleAdy();
+    applyCurveToAdy(input, params);
+    expect(input.detectedChannels[0].customTargetCurvePoints).toEqual([]);
+    expect(input.enTargetCurveType).toBe(0);
+  });
+
+  it('preserves unrelated fields', () => {
+    const result = applyCurveToAdy(createSampleAdy(), params);
+    expect(result.detectedChannels[0].responseData).toEqual({ 0: [1, 2, 3] });
+    expect(result.title).toBe('Sample');
+  });
+});
+
+describe('serializeAdy', () => {
+  it('round-trips through parseAdy', () => {
+    const original = createSampleAdy();
+    const text = serializeAdy(original);
+    const reparsed = parseAdy(text);
+    expect(reparsed).toEqual(original);
+  });
+});

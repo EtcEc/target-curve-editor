@@ -61,3 +61,38 @@ export function parseAdy(jsonText: string): AdyFile {
 export function isSubwooferChannel(channel: AdyChannel): boolean {
   return channel.commandId.startsWith('SW');
 }
+
+import { frequencyGrid, writtenGain, computeTrimShift, type CurveParams } from './curve';
+
+const FORCED_TARGET_CURVE_TYPE = 2;
+
+function formatPoint(freq: number, gain: number): string {
+  return `{${freq.toFixed(1)}, ${gain.toFixed(3)}}`;
+}
+
+/**
+ * Returns a new AdyFile with the designed curve written to every channel,
+ * subwoofer trim compensated, and enTargetCurveType forced to the value
+ * that matches the modeled HF knee. Does not mutate the input.
+ */
+export function applyCurveToAdy(ady: AdyFile, params: CurveParams): AdyFile {
+  const clone = JSON.parse(JSON.stringify(ady)) as AdyFile;
+  const grid = frequencyGrid();
+  const points = grid.map((f) => formatPoint(f, writtenGain(f, params)));
+  const trimShift = computeTrimShift(params);
+
+  for (const channel of clone.detectedChannels) {
+    channel.customTargetCurvePoints = points;
+    if (isSubwooferChannel(channel)) {
+      const originalTrim = parseFloat(channel.trimAdjustment);
+      channel.trimAdjustment = (originalTrim + trimShift).toFixed(6);
+    }
+  }
+
+  clone.enTargetCurveType = FORCED_TARGET_CURVE_TYPE;
+  return clone;
+}
+
+export function serializeAdy(ady: AdyFile): string {
+  return JSON.stringify(ady);
+}
