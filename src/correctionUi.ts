@@ -131,12 +131,19 @@ export function initCorrectionUi(onChange: () => void): CorrectionUi {
     show(generateWarnings, result.warnings.length > 0 ? result.warnings.join(' ') : null);
   }
 
+  function clearReport(): void {
+    reportBody.innerHTML = '';
+    reportTable.hidden = true;
+    show(generateWarnings, null);
+  }
+
   fileInput.addEventListener('change', async () => {
     const file = fileInput.files?.[0];
     if (!file) return;
     try {
       correction = parseCorrection(await file.text());
       show(errorNode, null);
+      clearReport();
     } catch (err) {
       correction = null;
       show(errorNode, (err as Error).message);
@@ -147,19 +154,36 @@ export function initCorrectionUi(onChange: () => void): CorrectionUi {
 
   enabled.addEventListener('change', () => onChange());
 
-  cutoffInput.addEventListener('input', () => {
+  function cutoffValid(): boolean {
     const value = Number(cutoffInput.value);
-    if (Number.isFinite(value) && value >= MIN_CUTOFF_HZ && value <= MAX_CUTOFF_HZ) {
-      cutoffHz = value;
+    return cutoffInput.value.trim() !== '' && Number.isFinite(value) && value >= MIN_CUTOFF_HZ && value <= MAX_CUTOFF_HZ;
+  }
+
+  function markCutoff(): void {
+    const ok = cutoffValid();
+    cutoffInput.setCustomValidity(ok ? '' : `Enter ${MIN_CUTOFF_HZ} to ${MAX_CUTOFF_HZ} Hz.`);
+    cutoffInput.title = ok ? '' : `Enter ${MIN_CUTOFF_HZ} to ${MAX_CUTOFF_HZ} Hz.`;
+  }
+
+  cutoffInput.addEventListener('input', () => {
+    markCutoff();
+    if (cutoffValid()) {
+      cutoffHz = Number(cutoffInput.value);
       renderApply();
       onChange();
     }
+  });
+
+  cutoffInput.addEventListener('change', () => {
+    if (!cutoffValid()) cutoffInput.value = String(cutoffHz);
+    markCutoff();
   });
 
   measuredInput.addEventListener('change', async () => {
     const file = measuredInput.files?.[0];
     measuredAdy = null;
     rows.innerHTML = '';
+    clearReport();
     if (!file) {
       updateGenerateEnabled();
       return;
@@ -198,11 +222,13 @@ export function initCorrectionUi(onChange: () => void): CorrectionUi {
       enabled.checked = true;
       downloadJson('correction.json', serializeCorrection(result.correction));
       show(generateError, null);
+      show(errorNode, null);
       renderReport(result);
       renderApply();
       onChange();
     } catch (err) {
       show(generateError, (err as Error).message);
+      clearReport();
     } finally {
       updateGenerateEnabled();
     }
