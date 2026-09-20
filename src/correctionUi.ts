@@ -88,7 +88,7 @@ export function initCorrectionUi(onChange: () => void): CorrectionUi {
       return;
     }
     loaded.hidden = false;
-    info.textContent = `${correction.label || '(no label)'}, created ${correction.created}`;
+    info.textContent = `Correction loaded: ${correction.label || 'unlabelled'} (created ${correction.created})`;
     summaryBody.innerHTML = '';
     const summary = summarizeCorrection(correction, cutoffHz, baseChannelIds);
     for (const row of summary) {

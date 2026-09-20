@@ -37,6 +37,8 @@ const channelSummaryBody = document.querySelector('#channel-summary tbody') as H
 const noSubwooferWarning = document.getElementById('no-subwoofer-warning') as HTMLElement;
 const downloadSection = document.getElementById('download-section') as HTMLElement;
 const downloadSummary = document.getElementById('download-summary') as HTMLElement;
+const editorPlaceholder = document.getElementById('editor-placeholder') as HTMLElement;
+const downloadPlaceholder = document.getElementById('download-placeholder') as HTMLElement;
 const downloadButton = document.getElementById('download') as HTMLButtonElement;
 const correctionUi = initCorrectionUi(() => onParamsChanged());
 
@@ -45,6 +47,8 @@ function showError(message: string): void {
   errorMessage.hidden = false;
   editor.hidden = true;
   downloadSection.hidden = true;
+  editorPlaceholder.hidden = false;
+  downloadPlaceholder.hidden = false;
 }
 
 function clearError(): void {
@@ -61,6 +65,8 @@ function loadFile(file: File): void {
       clearError();
       editor.hidden = false;
       downloadSection.hidden = false;
+      editorPlaceholder.hidden = true;
+      downloadPlaceholder.hidden = true;
       renderChannelSummary();
       renderDownloadSummary();
       if (!chart) {
@@ -113,11 +119,9 @@ function renderChannelSummary(): void {
 function renderDownloadSummary(): void {
   if (!currentAdy) return;
   const trims = correctionUi.getTrims();
-  const trimmed = hasAppliedTrims(currentAdy, trims)
-    ? currentAdy.detectedChannels
-        .filter((c) => !isSubwooferChannel(c) && trims?.has(c.commandId))
-        .map((c) => c.commandId)
-    : [];
+  const trimmed = currentAdy.detectedChannels
+    .filter((c) => !isSubwooferChannel(c) && trims?.has(c.commandId))
+    .map((c) => c.commandId);
   downloadSummary.textContent = buildDownloadSummary(params, trimmed, correctionUi.getCutoffHz());
 }
 
@@ -147,11 +151,14 @@ dropzone.addEventListener('drop', (event) => {
 function syncPair(range: HTMLInputElement, number: HTMLInputElement, onChange: (value: number) => void): void {
   range.addEventListener('input', () => {
     number.value = range.value;
-    onChange(parseFloat(range.value));
+    const value = parseFloat(range.value);
+    if (Number.isFinite(value)) onChange(value);
   });
   number.addEventListener('input', () => {
+    const value = parseFloat(number.value);
+    if (!Number.isFinite(value)) return; // cleared/invalid: keep the last valid value
     range.value = number.value;
-    onChange(parseFloat(number.value));
+    onChange(value);
   });
 }
 

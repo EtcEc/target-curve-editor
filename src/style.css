@@ -60,8 +60,13 @@ summary {
   font-weight: bold;
 }
 
-details details {
-  margin-left: 1rem;
+#correction-info {
+  font-weight: bold;
+}
+
+.placeholder {
+  color: #777;
+  font-size: 0.9rem;
 }
 
 .hint {

@@ -31,4 +31,14 @@ describe('buildDownloadSummary', () => {
       'Contains: 0.7 dB/oct tilt, no bass shelf; measured trim on FL above 500 Hz.'
     );
   });
+
+  it('says no measured correction when channels are trimmed but cutoff is null', () => {
+    expect(buildDownloadSummary(base, ['FL', 'FR'], null)).toContain('no measured correction.');
+  });
+
+  it('handles shelf off together with knee cancellation off', () => {
+    expect(buildDownloadSummary({ ...base, shelfEnabled: false, cancelHfKnee: false }, [], null)).toBe(
+      'Contains: 0.7 dB/oct tilt, no bass shelf; no measured correction; HF rolloff cancellation off.'
+    );
+  });
 });
