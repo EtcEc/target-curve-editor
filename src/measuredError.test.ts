@@ -1,5 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { averagePositions, logGrid, normalizeLevel, rmsOver, smoothToGrid } from './measuredError';
+import type { AdyChannel } from './ady';
+import { hfKneeGain } from './hfKnee';
+import {
+  TargetParseError,
+  averagePositions,
+  computeError,
+  effectiveTarget,
+  logGrid,
+  normalizeLevel,
+  rmsOver,
+  smoothToGrid,
+} from './measuredError';
 import { synthMeasurement } from './fixtures/synthMeasurement';
 
 const powerMean = (a: number, b: number) => 10 * Math.log10((10 ** (a / 10) + 10 ** (b / 10)) / 2);
@@ -95,5 +106,79 @@ describe('rmsOver', () => {
 
   it('returns 0 when no grid point falls in the range', () => {
     expect(rmsOver(logGrid().map(() => 5), 30000, 40000)).toBe(0);
+  });
+});
+
+function channelWith(points: string[]): AdyChannel {
+  return { commandId: 'FL', customTargetCurvePoints: points, trimAdjustment: '0.000000' };
+}
+
+/** Points in the same "{freq, gain}" format the app writes into .ady files. */
+function pointsFor(fn: (f: number) => number): string[] {
+  return logGrid().map((f) => `{${f.toFixed(3)}, ${fn(f).toFixed(3)}}`);
+}
+
+describe('effectiveTarget', () => {
+  it('is the knee alone for a channel with no custom points (stock calibration)', () => {
+    const grid = logGrid();
+    const target = effectiveTarget(channelWith([]));
+    expect(target[grid.length - 1]).toBeCloseTo(hfKneeGain(20000), 3);
+    expect(target[grid.findIndex((f) => f >= 1000)]).toBeCloseTo(0, 2);
+  });
+
+  it('ignores a constant offset in the written points', () => {
+    const stock = effectiveTarget(channelWith([]));
+    const offset = effectiveTarget(channelWith(pointsFor(() => 4.5)));
+    offset.forEach((v, i) => expect(v).toBeCloseTo(stock[i], 6));
+  });
+
+  it('adds the knee on top of the written curve', () => {
+    const tilt = (f: number) => -0.7 * Math.log2(f / 1000);
+    const grid = logGrid();
+    const target = effectiveTarget(channelWith(pointsFor(tilt)));
+    // level normalisation shifts everything by a constant, so compare differences
+    const i = grid.findIndex((f) => f >= 10000);
+    const j = grid.findIndex((f) => f >= 1000);
+    const raw = (f: number) => tilt(f) + hfKneeGain(f);
+    expect(target[i] - target[j]).toBeCloseTo(raw(grid[i]) - raw(grid[j]), 2);
+  });
+
+  it('throws TargetParseError for a point it cannot read', () => {
+    expect(() => effectiveTarget(channelWith(['{20.0 4.5}']))).toThrow(TargetParseError);
+    expect(() => effectiveTarget(channelWith(['{20.0 4.5}']))).toThrow(/FL/);
+  });
+});
+
+describe('computeError', () => {
+  const tilt = (f: number) => -0.7 * Math.log2(f / 1000);
+  const bump = (f: number) => 1.5 * Math.exp(-(Math.log2(f / 8000) ** 2) / (2 * 0.3 ** 2));
+  const channel = () => channelWith(pointsFor(tilt));
+  // a chain that delivers exactly written + knee, plus a planted error bump at 8 kHz
+  const measuredFn = (f: number) => 70 + tilt(f) + hfKneeGain(f) + bump(f);
+
+  it('recovers a planted error shape', () => {
+    const grid = logGrid();
+    const error = computeError([synthMeasurement(measuredFn)], channel());
+    expect(error).toHaveLength(241);
+    expect(error[grid.findIndex((f) => f >= 8000)]).toBeCloseTo(1.5, 1);
+    expect(error[grid.findIndex((f) => f >= 1000)]).toBeCloseTo(0, 1);
+    expect(error[grid.findIndex((f) => f >= 100)]).toBeCloseTo(0, 1);
+  });
+
+  it('is near zero everywhere for a chain that hits the target exactly', () => {
+    // 0.3 dB rather than tighter: the smoothing window at the 20 kHz edge is one-sided
+    const error = computeError([synthMeasurement((f) => 70 + tilt(f) + hfKneeGain(f))], channel());
+    for (const v of error) expect(Math.abs(v)).toBeLessThan(0.3);
+  });
+
+  it('averages files that use different frequency grids', () => {
+    const smooth = (f: number) => 70 + 3 * Math.sin(Math.log2(f));
+    const single = computeError([synthMeasurement(smooth, 3000)], channelWith([]));
+    const mixed = computeError([synthMeasurement(smooth, 3000), synthMeasurement(smooth, 1500)], channelWith([]));
+    single.forEach((v, i) => expect(Math.abs(v - mixed[i])).toBeLessThan(0.05));
+  });
+
+  it('throws when given no measurements', () => {
+    expect(() => computeError([], channel())).toThrow();
   });
 });

@@ -1,3 +1,5 @@
+import type { AdyChannel } from './ady';
+import { hfKneeGain } from './hfKnee';
 import { interpLogFreq } from './logInterp';
 import type { RewMeasurement } from './rewParse';
 
@@ -90,4 +92,52 @@ export function rmsOver(curve: readonly number[], loHz: number, hiHz: number): n
     }
   });
   return count === 0 ? 0 : Math.sqrt(sum / count);
+}
+
+/** Thrown when a channel's customTargetCurvePoints can't be read. */
+export class TargetParseError extends Error {}
+
+const POINT_PATTERN = /^\{\s*([-+0-9.eE]+)\s*,\s*([-+0-9.eE]+)\s*\}$/;
+
+/** The channel's written curve (dB) on the grid; all zeros when it has no custom points. */
+function writtenCurve(channel: AdyChannel): number[] {
+  const grid = logGrid();
+  if (channel.customTargetCurvePoints.length === 0) return grid.map(() => 0);
+
+  const points = channel.customTargetCurvePoints.map((raw) => {
+    const match = POINT_PATTERN.exec(String(raw).trim());
+    const freq = match ? Number(match[1]) : NaN;
+    const gain = match ? Number(match[2]) : NaN;
+    if (!Number.isFinite(freq) || !Number.isFinite(gain) || freq <= 0) {
+      throw new TargetParseError(`Channel ${channel.commandId}: cannot read curve point "${String(raw)}"`);
+    }
+    return { freq, gain };
+  });
+  points.sort((a, b) => a.freq - b.freq);
+  const xs = points.map((p) => p.freq);
+  const ys = points.map((p) => p.gain);
+  return grid.map((f) => interpLogFreq(xs, ys, f));
+}
+
+/**
+ * What Audyssey is actually aiming for on this channel: the written curve plus
+ * the HF knee it always applies on top (the knee alone for a stock
+ * calibration), level-normalised so only shape matters.
+ */
+export function effectiveTarget(channel: AdyChannel): number[] {
+  const grid = logGrid();
+  const written = writtenCurve(channel);
+  return normalizeLevel(grid.map((f, i) => written[i] + hfKneeGain(f)));
+}
+
+/**
+ * E(f) = measured - target, on the grid: the measurements are smoothed,
+ * power-averaged across positions and level-normalised, then the channel's
+ * effective target is subtracted.
+ */
+export function computeError(measurements: readonly RewMeasurement[], channel: AdyChannel): number[] {
+  if (measurements.length === 0) throw new Error('computeError: no measurements');
+  const measured = normalizeLevel(averagePositions(measurements.map(smoothToGrid)));
+  const target = effectiveTarget(channel);
+  return measured.map((v, i) => v - target[i]);
 }
