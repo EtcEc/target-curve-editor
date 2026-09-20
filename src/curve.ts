@@ -33,6 +33,13 @@ export interface CurveParams {
   shelfEnabled: boolean;
   /** Flat plateau gain (dB) the curve sits at below ~40Hz. Only used when shelfEnabled. */
   shelfGain: number;
+  /**
+   * Pre-cancel Audyssey's fixed HF rolloff in the written curve. Defaults to
+   * true. Turn off to write the raw designed curve instead -- a diagnostic for
+   * checking whether the AVR actually applies that rolloff on top of custom
+   * points, or whether it's only drawn in the MultEQ app's Curve Editor.
+   */
+  cancelHfKnee?: boolean;
 }
 
 /** Smooth 0->1 ease with zero slope at both ends. */
@@ -60,11 +67,13 @@ export function designGain(freq: number, params: CurveParams): number {
 
 /**
  * The curve actually written to the .ady file: the designed curve with
- * Audyssey's fixed HF-knee rolloff pre-cancelled, so what you designed is
- * what you actually get after Audyssey applies its own knee on top.
+ * Audyssey's fixed HF-knee rolloff pre-cancelled (unless cancelHfKnee is
+ * false), so what you designed is what you actually get after Audyssey
+ * applies its own knee on top.
  */
 export function writtenGain(freq: number, params: CurveParams): number {
-  return designGain(freq, params) - hfKneeGain(freq);
+  const design = designGain(freq, params);
+  return params.cancelHfKnee === false ? design : design - hfKneeGain(freq);
 }
 
 /**

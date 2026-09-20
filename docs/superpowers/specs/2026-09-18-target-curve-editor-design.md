@@ -111,7 +111,17 @@ design(f)   = shelfGain*(1 - weight(f)) + tilt(f)*weight(f)   if shelf enabled
             = tilt(f)                                         if shelf disabled
 
 written(f)  = design(f) - hfKneeGain(f)        # pre-cancels Audyssey's fixed HF knee
+            = design(f)                        # if cancelHfKnee is off (diagnostic, see below)
 ```
+
+`cancelHfKnee` (UI checkbox, on by default) exists as a diagnostic. Measured
+in-room responses came out flat/rising above ~4kHz instead of continuing the
+tilt, which is what you'd see if the AVR never applies the knee that the
+MultEQ app's Curve Editor draws on top of custom points (cancelling a knee
+that is never applied adds a treble lift). Exporting with it off and
+measuring settles it: a straight tilt means the knee is display-only; an
+extra ~6dB rolloff by 20kHz means it is applied. Files exported this way get
+a `_no-knee-cancel` filename suffix.
 
 At `f <= 40Hz`, `design(f) === shelfGain` exactly (weight is 0). At `f >= 100Hz`,
 `design(f) === tilt(f)` exactly (weight is 1) -- the shelf has zero influence

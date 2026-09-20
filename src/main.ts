@@ -16,6 +16,7 @@ const params: CurveParams = {
   slope: 0.7,
   shelfEnabled: true,
   shelfGain: 4.5,
+  cancelHfKnee: true,
 };
 
 const dropzone = document.getElementById('dropzone') as HTMLElement;
@@ -26,6 +27,7 @@ const chartContainer = document.getElementById('chart') as HTMLElement;
 const slopeRange = document.getElementById('slope') as HTMLInputElement;
 const slopeNumber = document.getElementById('slope-number') as HTMLInputElement;
 const shelfEnabledInput = document.getElementById('shelf-enabled') as HTMLInputElement;
+const cancelHfKneeInput = document.getElementById('cancel-hf-knee') as HTMLInputElement;
 const shelfGainRange = document.getElementById('shelf-gain') as HTMLInputElement;
 const shelfGainNumber = document.getElementById('shelf-gain-number') as HTMLInputElement;
 const channelSummaryBody = document.querySelector('#channel-summary tbody') as HTMLElement;
@@ -146,6 +148,11 @@ shelfEnabledInput.addEventListener('change', () => {
   onParamsChanged();
 });
 
+cancelHfKneeInput.addEventListener('change', () => {
+  params.cancelHfKnee = cancelHfKneeInput.checked;
+  onParamsChanged();
+});
+
 downloadButton.addEventListener('click', () => {
   if (!currentAdy) return;
   const result = applyCurveToAdy(currentAdy, params);
@@ -153,10 +160,12 @@ downloadButton.addEventListener('click', () => {
   const blob = new Blob([text], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
+  // distinct name so a no-cancel test file can't be mistaken for the normal one
+  const suffix = params.cancelHfKnee === false ? '_no-knee-cancel' : '';
   const filename =
     typeof result.title === 'string' && result.title.length > 0
-      ? `${result.title}_corrected.ady`
-      : 'corrected.ady';
+      ? `${result.title}_corrected${suffix}.ady`
+      : `corrected${suffix}.ady`;
   a.href = url;
   a.download = filename;
   a.click();

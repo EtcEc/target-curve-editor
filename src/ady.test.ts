@@ -52,7 +52,7 @@ describe('isSubwooferChannel', () => {
 });
 
 import { applyCurveToAdy, serializeAdy } from './ady';
-import { computeTrimShift, frequencyGrid, type CurveParams } from './curve';
+import { computeTrimShift, designGain, frequencyGrid, type CurveParams } from './curve';
 
 describe('applyCurveToAdy', () => {
   const params: CurveParams = { slope: 3, shelfEnabled: false, shelfGain: 0 };
@@ -88,6 +88,14 @@ describe('applyCurveToAdy', () => {
     const result = applyCurveToAdy(createSampleAdy(), params);
     expect(result.detectedChannels[0].responseData).toEqual({ 0: [1, 2, 3] });
     expect(result.title).toBe('Sample');
+  });
+
+  it('writes the raw designed curve (no knee cancellation) when cancelHfKnee is false', () => {
+    const noCancel: CurveParams = { ...params, cancelHfKnee: false };
+    const result = applyCurveToAdy(createSampleAdy(), noCancel);
+    const points = result.detectedChannels[0].customTargetCurvePoints;
+    // 20kHz is where the knee is largest (-6.13dB), so cancelled vs raw differ most here
+    expect(points[points.length - 1]).toBe(`{20000.0, ${designGain(20000, noCancel).toFixed(3)}}`);
   });
 });
 

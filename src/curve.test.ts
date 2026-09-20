@@ -94,6 +94,17 @@ describe('writtenGain', () => {
     const params: CurveParams = { slope: 3, shelfEnabled: false, shelfGain: 0 };
     expect(writtenGain(100, params)).toBeCloseTo(designGain(100, params), 3);
   });
+
+  it('equals designGain exactly when cancelHfKnee is false', () => {
+    const params: CurveParams = { slope: 3, shelfEnabled: false, shelfGain: 0, cancelHfKnee: false };
+    expect(writtenGain(10000, params)).toBeCloseTo(designGain(10000, params), 9);
+    expect(writtenGain(20000, params)).toBeCloseTo(designGain(20000, params), 9);
+  });
+
+  it('still cancels the HF knee when cancelHfKnee is explicitly true', () => {
+    const params: CurveParams = { slope: 3, shelfEnabled: false, shelfGain: 0, cancelHfKnee: true };
+    expect(writtenGain(10000, params)).toBeCloseTo(designGain(10000, params) - hfKneeGain(10000), 9);
+  });
 });
 
 describe('computeTrimShift', () => {
@@ -113,5 +124,10 @@ describe('computeTrimShift', () => {
   it('equals the negative of the HF knee minimum when slope is 0 (flat design, pure knee cancellation)', () => {
     const params: CurveParams = { slope: 0, shelfEnabled: false, shelfGain: 0 };
     expect(computeTrimShift(params)).toBeCloseTo(6.1328, 3);
+  });
+
+  it('is 0 for a flat design with knee cancellation off (nothing to compensate)', () => {
+    const params: CurveParams = { slope: 0, shelfEnabled: false, shelfGain: 0, cancelHfKnee: false };
+    expect(computeTrimShift(params)).toBeCloseTo(0, 9);
   });
 });
