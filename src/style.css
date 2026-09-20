@@ -89,3 +89,43 @@ details details {
 #correction-cutoff:invalid {
   outline: 2px solid #f66;
 }
+
+.step {
+  margin-top: 2rem;
+}
+
+.step-heading {
+  font-size: 1.25rem;
+  margin: 2rem 0 0.5rem;
+}
+
+.step-num {
+  display: inline-block;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  line-height: 1.75rem;
+  margin-right: 0.4rem;
+  border-radius: 50%;
+  background: #333;
+  color: #eee;
+  text-align: center;
+  font-size: 1rem;
+}
+
+.optional {
+  color: #aaa;
+  font-weight: normal;
+  font-size: 0.9rem;
+}
+
+.summary {
+  color: #ccc;
+  border-left: 3px solid #555;
+  padding-left: 0.75rem;
+}
+
+#correction-generate {
+  margin-left: 0;
+  padding-top: 0.5rem;
+  border-top: 1px solid #333;
+}

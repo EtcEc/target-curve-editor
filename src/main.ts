@@ -9,6 +9,7 @@ import {
 } from './ady';
 import { createChart, updateChart } from './chart';
 import { initCorrectionUi } from './correctionUi';
+import { buildDownloadSummary } from './downloadSummary';
 import { computeTrimShift, type CurveParams } from './curve';
 
 let currentAdy: AdyFile | null = null;
@@ -34,6 +35,8 @@ const shelfGainRange = document.getElementById('shelf-gain') as HTMLInputElement
 const shelfGainNumber = document.getElementById('shelf-gain-number') as HTMLInputElement;
 const channelSummaryBody = document.querySelector('#channel-summary tbody') as HTMLElement;
 const noSubwooferWarning = document.getElementById('no-subwoofer-warning') as HTMLElement;
+const downloadSection = document.getElementById('download-section') as HTMLElement;
+const downloadSummary = document.getElementById('download-summary') as HTMLElement;
 const downloadButton = document.getElementById('download') as HTMLButtonElement;
 const correctionUi = initCorrectionUi(() => onParamsChanged());
 
@@ -41,6 +44,7 @@ function showError(message: string): void {
   errorMessage.textContent = message;
   errorMessage.hidden = false;
   editor.hidden = true;
+  downloadSection.hidden = true;
 }
 
 function clearError(): void {
@@ -56,7 +60,9 @@ function loadFile(file: File): void {
       correctionUi.setBaseChannels(currentAdy.detectedChannels.map((c) => c.commandId));
       clearError();
       editor.hidden = false;
+      downloadSection.hidden = false;
       renderChannelSummary();
+      renderDownloadSummary();
       if (!chart) {
         chart = createChart(chartContainer, params);
       } else {
@@ -104,9 +110,23 @@ function renderChannelSummary(): void {
   noSubwooferWarning.hidden = anySubwoofer;
 }
 
+function renderDownloadSummary(): void {
+  if (!currentAdy) return;
+  const trims = correctionUi.getTrims();
+  const trimmed = hasAppliedTrims(currentAdy, trims)
+    ? currentAdy.detectedChannels
+        .filter((c) => !isSubwooferChannel(c) && trims?.has(c.commandId))
+        .map((c) => c.commandId)
+    : [];
+  downloadSummary.textContent = buildDownloadSummary(params, trimmed, correctionUi.getCutoffHz());
+}
+
 function onParamsChanged(): void {
   if (chart) updateChart(chart, params);
-  if (currentAdy) renderChannelSummary();
+  if (currentAdy) {
+    renderChannelSummary();
+    renderDownloadSummary();
+  }
 }
 
 fileInput.addEventListener('change', () => {

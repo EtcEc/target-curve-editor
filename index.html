@@ -10,6 +10,8 @@
     <div id="app">
       <h1>Audyssey Target Curve Editor</h1>
 
+      <h2 class="step-heading"><span class="step-num">1</span> Load your .ady</h2>
+      <p class="hint">The raw file from MultEQ-X: your starting point. This is the file the download edits.</p>
       <section id="dropzone">
         <p>Drag and drop a .ady file here, or click to choose one.</p>
         <input type="file" id="file-input" accept=".ady" />
@@ -17,7 +19,8 @@
 
       <p id="error-message" class="error" hidden></p>
 
-      <section id="editor" hidden>
+      <section id="editor" class="step" hidden>
+        <h2 class="step-heading"><span class="step-num">2</span> Design the curve</h2>
         <div id="controls">
           <label>
             Slope (dB/octave)
@@ -58,68 +61,78 @@
         <p id="no-subwoofer-warning" class="warning" hidden>
           No subwoofer channel detected — trim compensation was skipped.
         </p>
+      </section>
 
-        <details id="measured-correction">
-          <summary>Measured correction (optional)</summary>
+      <section id="measured-correction" class="step">
+        <h2 class="step-heading"><span class="step-num">3</span> Measured correction <span class="optional">(optional)</span></h2>
+        <p class="hint">
+          Trims each speaker toward its measured response above the cutoff. Applied on top of the curve from step 2.
+        </p>
+        <h3>Apply a correction file</h3>
+        <input type="file" id="correction-file-input" accept=".json,application/json" />
+        <p id="correction-error" class="error" hidden></p>
 
-          <h3>Apply a correction file</h3>
-          <input type="file" id="correction-file-input" accept=".json,application/json" />
-          <p id="correction-error" class="error" hidden></p>
+        <div id="correction-loaded" hidden>
+          <p id="correction-info"></p>
+          <label>
+            <input type="checkbox" id="correction-enabled" checked />
+            Apply correction
+          </label>
+          <label>
+            Cutoff (Hz)
+            <input type="number" id="correction-cutoff" min="200" max="18000" step="100" value="2000" />
+          </label>
+          <table id="correction-summary">
+            <thead>
+              <tr>
+                <th>Channel</th>
+                <th>Positions</th>
+                <th>Largest trim (dB)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <p id="correction-notice" class="warning" hidden></p>
+        </div>
 
-          <div id="correction-loaded" hidden>
-            <p id="correction-info"></p>
-            <label>
-              <input type="checkbox" id="correction-enabled" checked />
-              Apply correction
-            </label>
-            <label>
-              Cutoff (Hz)
-              <input type="number" id="correction-cutoff" min="200" max="18000" step="100" value="2000" />
-            </label>
-            <table id="correction-summary">
-              <thead>
-                <tr>
-                  <th>Channel</th>
-                  <th>Positions</th>
-                  <th>Largest trim (dB)</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-            <p id="correction-notice" class="warning" hidden></p>
-          </div>
-
-          <details id="correction-generate">
-            <summary>Generate a correction file</summary>
-            <p class="hint">
-              1. Pick the .ady you measured with. 2. Add the REW text exports for each speaker (about 3 positions
-              each is plenty). 3. Generate.
-            </p>
-            <label>
-              The .ady you measured with
-              <input type="file" id="measured-ady-input" accept=".ady" />
-            </label>
-            <p id="generate-error" class="error" hidden></p>
-            <div id="generate-rows"></div>
-            <label>
-              Label (optional)
-              <input type="text" id="generate-label" placeholder="e.g. which mic" />
-            </label>
-            <button id="generate-button" disabled>Generate and download correction.json</button>
-            <p id="generate-warnings" class="warning" hidden></p>
-            <table id="generate-report" hidden>
-              <thead>
-                <tr>
-                  <th>Channel</th>
-                  <th>Positions</th>
-                  <th>Error RMS 2-20 kHz (dB)</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </details>
+        <details id="correction-generate">
+          <summary>No correction file yet? Create one from measurements</summary>
+          <p class="hint">
+            Load the base .ady in step 1 (raw, what you edit and export). Here, pick the .ady you measured with:
+            the one saved from the calibration you measured, which carries the target curve. It tells the tool
+            what each speaker was aiming for.
+          </p>
+          <p class="hint">
+            Then add the REW text exports for each speaker (about 3 positions each is plenty) and generate.
+          </p>
+          <label>
+            The .ady you measured with
+            <input type="file" id="measured-ady-input" accept=".ady" />
+          </label>
+          <p id="generate-error" class="error" hidden></p>
+          <div id="generate-rows"></div>
+          <label>
+            Label (optional)
+            <input type="text" id="generate-label" placeholder="e.g. which mic" />
+          </label>
+          <button id="generate-button" disabled>Generate and download correction.json</button>
+          <p id="generate-warnings" class="warning" hidden></p>
+          <table id="generate-report" hidden>
+            <thead>
+              <tr>
+                <th>Channel</th>
+                <th>Positions</th>
+                <th>Error RMS 2-20 kHz (dB)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </details>
+      </section>
 
+      <section id="download-section" class="step" hidden>
+        <h2 class="step-heading"><span class="step-num">4</span> Download</h2>
+        <p id="download-summary" class="summary"></p>
         <button id="download">Download corrected .ady</button>
       </section>
     </div>

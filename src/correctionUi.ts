@@ -15,6 +15,8 @@ export interface CorrectionUi {
   setBaseChannels(ids: string[]): void;
   /** Per-channel trims to apply on export, or undefined when none are loaded or applied. */
   getTrims(): ReadonlyMap<string, TrimFn> | undefined;
+  /** The current (valid) cutoff in Hz. */
+  getCutoffHz(): number;
 }
 
 const MIN_CUTOFF_HZ = 200;
@@ -95,7 +97,8 @@ export function initCorrectionUi(onChange: () => void): CorrectionUi {
       summaryBody.appendChild(tr);
     }
     const ignored = summary.filter((r) => !r.inBase).map((r) => r.commandId);
-    show(notice, ignored.length > 0 ? `Not in the loaded .ady, so ignored: ${ignored.join(', ')}.` : null);
+    // with no base .ady loaded yet, "ignored" would be meaningless
+    show(notice, baseChannelIds.length > 0 && ignored.length > 0 ? `Not in the loaded .ady, so ignored: ${ignored.join(', ')}.` : null);
   }
 
   function rowInputs(): HTMLInputElement[] {
@@ -248,6 +251,9 @@ export function initCorrectionUi(onChange: () => void): CorrectionUi {
     getTrims(): ReadonlyMap<string, TrimFn> | undefined {
       if (!correction || !enabled.checked) return undefined;
       return buildChannelTrims(correction, cutoffHz);
+    },
+    getCutoffHz(): number {
+      return cutoffHz;
     },
   };
 }
