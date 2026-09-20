@@ -52,3 +52,17 @@ new dependencies. Steps are headings/labels, not a wizard (nothing is locked).
 - The download summary must reflect `hasAppliedTrims` (only claim trims on
   channels that actually get one).
 - Verified manually in the browser (no DOM unit tests in this project).
+
+## Amendment: generator in a modal dialog
+
+The "create a correction from measurements" flow is no longer an inline
+`<details>` fold-out. Step 3 shows a button ("Create a correction from
+measurements…") that opens a native `<dialog id="generate-dialog">` via
+`showModal()`. The dialog holds the explanation, the measured `.ady` input and
+its error, the per-channel file rows, the label, and the Generate button; it
+closes with a Close button, Escape, or a click on the backdrop. On a successful
+generate the correction is downloaded and loaded as before and the dialog closes
+itself; errors stay inside the dialog, which stays open. The per-row report
+(`#generate-report`) and the RMS warnings (`#generate-warnings`) moved into step
+3, beneath the loaded-correction info, so they remain visible after the dialog
+closes. Still works with no base `.ady` loaded.

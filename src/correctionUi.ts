@@ -77,6 +77,14 @@ export function initCorrectionUi(onChange: () => void): CorrectionUi {
   const reportTable = el<HTMLElement>('generate-report');
   const reportBody = query<HTMLElement>('#generate-report tbody');
 
+  const dialog = el<HTMLDialogElement>('generate-dialog');
+  el<HTMLElement>('generate-open').addEventListener('click', () => dialog.showModal());
+  el<HTMLElement>('generate-close').addEventListener('click', () => dialog.close());
+  // a click on the backdrop targets the dialog element itself (content is in child nodes)
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) dialog.close();
+  });
+
   let correction: CorrectionFile | null = null;
   let cutoffHz = DEFAULT_CUTOFF_HZ;
   let baseChannelIds: string[] = [];
@@ -235,6 +243,7 @@ export function initCorrectionUi(onChange: () => void): CorrectionUi {
       renderReport(result);
       renderApply();
       onChange();
+      dialog.close();
     } catch (err) {
       show(generateError, (err as Error).message);
       clearReport();
