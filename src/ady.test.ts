@@ -51,8 +51,8 @@ describe('isSubwooferChannel', () => {
   });
 });
 
-import { applyCurveToAdy, serializeAdy } from './ady';
-import { computeTrimShift, designGain, frequencyGrid, type CurveParams } from './curve';
+import { applyCurveToAdy, hasAppliedTrims, serializeAdy } from './ady';
+import { computeTrimShift, designGain, frequencyGrid, writtenGain, type CurveParams, type TrimFn } from './curve';
 
 describe('applyCurveToAdy', () => {
   const params: CurveParams = { slope: 3, shelfEnabled: false, shelfGain: 0 };
@@ -105,5 +105,73 @@ describe('serializeAdy', () => {
     const text = serializeAdy(original);
     const reparsed = parseAdy(text);
     expect(reparsed).toEqual(original);
+  });
+});
+
+describe('applyCurveToAdy with per-channel trims', () => {
+  const params: CurveParams = { slope: 0.7, shelfEnabled: false, shelfGain: 0 };
+  const trim: TrimFn = (f) => (f >= 5000 ? -1.5 : 0);
+
+  function threeChannelAdy() {
+    const ady = createSampleAdy();
+    ady.detectedChannels.push({ commandId: 'FR', customTargetCurvePoints: [], trimAdjustment: '0.000000' });
+    return ady;
+  }
+  const pointsOf = (ady: ReturnType<typeof threeChannelAdy>, id: string) =>
+    ady.detectedChannels.find((c) => c.commandId === id)!.customTargetCurvePoints;
+
+  it('is identical to the untrimmed output when the trims map is empty', () => {
+    expect(applyCurveToAdy(threeChannelAdy(), params, new Map())).toEqual(
+      applyCurveToAdy(threeChannelAdy(), params)
+    );
+  });
+
+  it('adds the trim only to the channel that has one', () => {
+    const result = applyCurveToAdy(threeChannelAdy(), params, new Map([['FL', trim]]));
+    const fl = pointsOf(result, 'FL');
+    const fr = pointsOf(result, 'FR');
+    expect(fl[fl.length - 1]).toBe(`{20000.0, ${(writtenGain(20000, params) - 1.5).toFixed(3)}}`);
+    expect(fr[fr.length - 1]).toBe(`{20000.0, ${writtenGain(20000, params).toFixed(3)}}`);
+    // below the trim's own onset the two channels are identical
+    expect(fl[0]).toBe(fr[0]);
+    expect(fl).toHaveLength(frequencyGrid().length);
+  });
+
+  it('never trims a subwoofer, even if the map names it', () => {
+    const plain = applyCurveToAdy(threeChannelAdy(), params);
+    const result = applyCurveToAdy(threeChannelAdy(), params, new Map([['SW1', trim]]));
+    expect(pointsOf(result, 'SW1')).toEqual(pointsOf(plain, 'SW1'));
+  });
+
+  it('leaves the subwoofer trim shift untouched', () => {
+    const plain = applyCurveToAdy(threeChannelAdy(), params);
+    const result = applyCurveToAdy(threeChannelAdy(), params, new Map([['FL', trim]]));
+    const sw = (a: typeof plain) => a.detectedChannels.find((c) => c.commandId === 'SW1')!.trimAdjustment;
+    expect(sw(result)).toBe(sw(plain));
+  });
+
+  it('does not mutate the input', () => {
+    const input = threeChannelAdy();
+    applyCurveToAdy(input, params, new Map([['FL', trim]]));
+    expect(pointsOf(input, 'FL')).toEqual([]);
+  });
+});
+
+describe('hasAppliedTrims', () => {
+  const ady = createSampleAdy(); // FL and SW1
+  const trim: TrimFn = () => 0;
+
+  it('is false when there are no trims', () => {
+    expect(hasAppliedTrims(ady, undefined)).toBe(false);
+    expect(hasAppliedTrims(ady, new Map())).toBe(false);
+  });
+
+  it('is true when a non-sub channel of the file has a trim', () => {
+    expect(hasAppliedTrims(ady, new Map([['FL', trim]]))).toBe(true);
+  });
+
+  it('is false when only the subwoofer or unknown channels have trims', () => {
+    expect(hasAppliedTrims(ady, new Map([['SW1', trim]]))).toBe(false);
+    expect(hasAppliedTrims(ady, new Map([['XX', trim]]))).toBe(false);
   });
 });
