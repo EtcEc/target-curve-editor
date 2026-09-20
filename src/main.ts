@@ -2,11 +2,13 @@ import {
   parseAdy,
   isSubwooferChannel,
   applyCurveToAdy,
+  hasAppliedTrims,
   serializeAdy,
   AdyValidationError,
   type AdyFile,
 } from './ady';
 import { createChart, updateChart } from './chart';
+import { initCorrectionUi } from './correctionUi';
 import { computeTrimShift, type CurveParams } from './curve';
 
 let currentAdy: AdyFile | null = null;
@@ -33,6 +35,7 @@ const shelfGainNumber = document.getElementById('shelf-gain-number') as HTMLInpu
 const channelSummaryBody = document.querySelector('#channel-summary tbody') as HTMLElement;
 const noSubwooferWarning = document.getElementById('no-subwoofer-warning') as HTMLElement;
 const downloadButton = document.getElementById('download') as HTMLButtonElement;
+const correctionUi = initCorrectionUi(() => onParamsChanged());
 
 function showError(message: string): void {
   errorMessage.textContent = message;
@@ -50,6 +53,7 @@ function loadFile(file: File): void {
     const text = reader.result as string;
     try {
       currentAdy = parseAdy(text);
+      correctionUi.setBaseChannels(currentAdy.detectedChannels.map((c) => c.commandId));
       clearError();
       editor.hidden = false;
       renderChannelSummary();
@@ -155,13 +159,16 @@ cancelHfKneeInput.addEventListener('change', () => {
 
 downloadButton.addEventListener('click', () => {
   if (!currentAdy) return;
-  const result = applyCurveToAdy(currentAdy, params);
+  const trims = correctionUi.getTrims();
+  const result = applyCurveToAdy(currentAdy, params, trims);
   const text = serializeAdy(result);
   const blob = new Blob([text], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  // distinct name so a no-cancel test file can't be mistaken for the normal one
-  const suffix = params.cancelHfKnee === false ? '_no-knee-cancel' : '';
+  // distinct names so test variants can't be mistaken for the normal file
+  const suffix =
+    (params.cancelHfKnee === false ? '_no-knee-cancel' : '') +
+    (hasAppliedTrims(currentAdy, trims) ? '_measured-trim' : '');
   const filename =
     typeof result.title === 'string' && result.title.length > 0
       ? `${result.title}_corrected${suffix}.ady`

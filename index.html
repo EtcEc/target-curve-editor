@@ -59,6 +59,67 @@
           No subwoofer channel detected — trim compensation was skipped.
         </p>
 
+        <details id="measured-correction">
+          <summary>Measured correction (optional)</summary>
+
+          <h3>Apply a correction file</h3>
+          <input type="file" id="correction-file-input" accept=".json,application/json" />
+          <p id="correction-error" class="error" hidden></p>
+
+          <div id="correction-loaded" hidden>
+            <p id="correction-info"></p>
+            <label>
+              <input type="checkbox" id="correction-enabled" checked />
+              Apply correction
+            </label>
+            <label>
+              Cutoff (Hz)
+              <input type="number" id="correction-cutoff" min="200" max="18000" step="100" value="2000" />
+            </label>
+            <table id="correction-summary">
+              <thead>
+                <tr>
+                  <th>Channel</th>
+                  <th>Positions</th>
+                  <th>Largest trim (dB)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+            <p id="correction-notice" class="warning" hidden></p>
+          </div>
+
+          <details id="correction-generate">
+            <summary>Generate a correction file</summary>
+            <p class="hint">
+              1. Pick the .ady you measured with. 2. Add the REW text exports for each speaker (about 3 positions
+              each is plenty). 3. Generate.
+            </p>
+            <label>
+              The .ady you measured with
+              <input type="file" id="measured-ady-input" accept=".ady" />
+            </label>
+            <p id="generate-error" class="error" hidden></p>
+            <div id="generate-rows"></div>
+            <label>
+              Label (optional)
+              <input type="text" id="generate-label" placeholder="e.g. which mic" />
+            </label>
+            <button id="generate-button" disabled>Generate and download correction.json</button>
+            <p id="generate-warnings" class="warning" hidden></p>
+            <table id="generate-report" hidden>
+              <thead>
+                <tr>
+                  <th>Channel</th>
+                  <th>Positions</th>
+                  <th>Error RMS 2-20 kHz (dB)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </details>
+        </details>
+
         <button id="download">Download corrected .ady</button>
       </section>
     </div>

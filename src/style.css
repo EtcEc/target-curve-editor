@@ -50,3 +50,38 @@ button {
   font-size: 1rem;
   padding: 0.5rem 1rem;
 }
+
+details {
+  margin: 1rem 0;
+}
+
+summary {
+  cursor: pointer;
+  font-weight: bold;
+}
+
+details details {
+  margin-left: 1rem;
+}
+
+.hint {
+  color: #aaa;
+  font-size: 0.9rem;
+}
+
+.gen-row {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin: 0.25rem 0;
+}
+
+.gen-row .channel-name {
+  min-width: 3.5rem;
+  font-weight: bold;
+}
+
+#measured-correction label {
+  display: block;
+  margin: 0.5rem 0;
+}
