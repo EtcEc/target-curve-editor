@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
   CorrectionValidationError,
+  DEFAULT_CUTOFF_HZ,
+  buildChannelTrims,
   createCorrection,
   parseCorrection,
   serializeCorrection,
+  summarizeCorrection,
+  trimFromError,
   type CorrectionFile,
 } from './correction';
 import { logGrid } from './measuredError';
@@ -83,5 +87,100 @@ describe('parseCorrection validation', () => {
   it('rejects a bad positions count', () => {
     expect(() => parseWith((raw) => (raw.channels.FL.positions = 0))).toThrow(/positions/);
     expect(() => parseWith((raw) => (raw.channels.FL.positions = 2.5))).toThrow(/positions/);
+  });
+});
+
+describe('trimFromError', () => {
+  const freq = logGrid();
+  const flat = (v: number) => freq.map(() => v);
+
+  it('defaults the cutoff to 2 kHz', () => {
+    expect(DEFAULT_CUTOFF_HZ).toBe(2000);
+  });
+
+  it('is zero below the fade, half at the cutoff and full above it (for a flat error)', () => {
+    const trim = trimFromError(flat(2), freq, 2000);
+    expect(trim(1000)).toBeCloseTo(0, 6);
+    expect(trim(2000)).toBeCloseTo(-1, 1);
+    expect(trim(2900)).toBeCloseTo(-2, 2);
+    expect(trim(10000)).toBeCloseTo(-2, 6);
+    expect(trim(20000)).toBeCloseTo(-2, 6);
+  });
+
+  it('is the negative of the error (a positive error gives a cut, a negative one a boost)', () => {
+    expect(trimFromError(flat(-2), freq, 2000)(10000)).toBeCloseTo(2, 6);
+  });
+
+  it('clamps to +/-3 dB', () => {
+    expect(trimFromError(flat(10), freq, 2000)(10000)).toBeCloseTo(-3, 6);
+    expect(trimFromError(flat(-10), freq, 2000)(10000)).toBeCloseTo(3, 6);
+  });
+
+  it('moves the fade with the cutoff', () => {
+    const trim = trimFromError(flat(2), freq, 4000);
+    expect(trim(2000)).toBeCloseTo(0, 6);
+    expect(trim(8000)).toBeCloseTo(-2, 6);
+  });
+
+  it('smooths a single-point spike instead of chasing it', () => {
+    const error = flat(0);
+    error[freq.findIndex((f) => f >= 8000)] = 10;
+    const trim = trimFromError(error, freq, 2000);
+    for (const f of freq) expect(Math.abs(trim(f))).toBeLessThan(0.5);
+  });
+
+  it('interpolates between grid points and clamps beyond the ends', () => {
+    const error = freq.map((f) => (f >= 5000 ? 2 : 0));
+    const trim = trimFromError(error, freq, 1000);
+    const between = trim(Math.sqrt(freq[100] * freq[101]));
+    const lo = Math.min(trim(freq[100]), trim(freq[101]));
+    const hi = Math.max(trim(freq[100]), trim(freq[101]));
+    expect(between).toBeGreaterThanOrEqual(lo - 1e-9);
+    expect(between).toBeLessThanOrEqual(hi + 1e-9);
+    expect(trim(50000)).toBeCloseTo(trim(20000), 9);
+    expect(trim(5)).toBeCloseTo(trim(20), 9);
+  });
+});
+
+describe('buildChannelTrims / summarizeCorrection', () => {
+  const freq = logGrid();
+  const correction: CorrectionFile = createCorrection(
+    {
+      FL: { positions: 3, error: freq.map(() => 2) },
+      FR: { positions: 2, error: freq.map(() => -1) },
+    },
+    '',
+    new Date('2026-09-20T12:00:00Z')
+  );
+
+  it('builds one trim function per channel', () => {
+    const trims = buildChannelTrims(correction, 2000);
+    expect([...trims.keys()].sort()).toEqual(['FL', 'FR']);
+    expect(trims.get('FL')!(10000)).toBeCloseTo(-2, 6);
+    expect(trims.get('FR')!(10000)).toBeCloseTo(1, 6);
+  });
+
+  it('summarises positions and the largest trim per channel', () => {
+    const rows = summarizeCorrection(correction, 2000, ['FL', 'FR', 'C']);
+    const fl = rows.find((r) => r.commandId === 'FL')!;
+    expect(fl.positions).toBe(3);
+    expect(fl.maxAbsTrim).toBeCloseTo(2, 6);
+    expect(fl.inBase).toBe(true);
+  });
+
+  it('flags channels the base file does not have', () => {
+    const rows = summarizeCorrection(correction, 2000, ['FL', 'C']);
+    expect(rows.find((r) => r.commandId === 'FR')!.inBase).toBe(false);
+  });
+
+  it('treats every channel as present when no base file is loaded yet', () => {
+    const rows = summarizeCorrection(correction, 2000, []);
+    expect(rows.every((r) => r.inBase)).toBe(true);
+  });
+
+  it('reports a smaller largest trim for a higher cutoff', () => {
+    const low = summarizeCorrection(correction, 2000, [])[0].maxAbsTrim;
+    const none = summarizeCorrection(correction, 60000, [])[0].maxAbsTrim;
+    expect(low).toBeGreaterThan(none);
   });
 });

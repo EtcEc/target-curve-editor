@@ -27,6 +27,9 @@ export function frequencyGrid(): number[] {
 const SHELF_LOW_FREQ = 40;
 const SHELF_HIGH_FREQ = 100;
 
+/** Extra gain (dB) added on top of a channel's written curve, as a function of frequency. */
+export type TrimFn = (freq: number) => number;
+
 export interface CurveParams {
   /** dB/octave. Positive tilts down toward treble, up toward bass. */
   slope: number;
@@ -43,7 +46,7 @@ export interface CurveParams {
 }
 
 /** Smooth 0->1 ease with zero slope at both ends. */
-function smoothstep(t: number): number {
+export function smoothstep(t: number): number {
   const clamped = Math.min(1, Math.max(0, t));
   return clamped * clamped * (3 - 2 * clamped);
 }
