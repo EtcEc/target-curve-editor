@@ -3,6 +3,7 @@ __pycache__/
 
 # personal calibration files — real room measurement data, keep out of the public repo
 *.ady
+correction*.json
 
 node_modules/
 dist/
