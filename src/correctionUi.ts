@@ -26,6 +26,12 @@ function el<T extends HTMLElement>(id: string): T {
   return found as T;
 }
 
+function query<T extends HTMLElement>(selector: string): T {
+  const found = document.querySelector(selector);
+  if (!found) throw new Error(`Missing element ${selector}`);
+  return found as T;
+}
+
 /** Shows `message` in `node`, or hides the node when `message` is null. */
 function show(node: HTMLElement, message: string | null): void {
   node.textContent = message ?? '';
@@ -56,7 +62,7 @@ export function initCorrectionUi(onChange: () => void): CorrectionUi {
   const info = el<HTMLElement>('correction-info');
   const enabled = el<HTMLInputElement>('correction-enabled');
   const cutoffInput = el<HTMLInputElement>('correction-cutoff');
-  const summaryBody = document.querySelector('#correction-summary tbody') as HTMLElement;
+  const summaryBody = query<HTMLElement>('#correction-summary tbody');
   const notice = el<HTMLElement>('correction-notice');
 
   // generate elements
@@ -67,7 +73,7 @@ export function initCorrectionUi(onChange: () => void): CorrectionUi {
   const generateButton = el<HTMLButtonElement>('generate-button');
   const generateWarnings = el<HTMLElement>('generate-warnings');
   const reportTable = el<HTMLElement>('generate-report');
-  const reportBody = document.querySelector('#generate-report tbody') as HTMLElement;
+  const reportBody = query<HTMLElement>('#generate-report tbody');
 
   let correction: CorrectionFile | null = null;
   let cutoffHz = DEFAULT_CUTOFF_HZ;

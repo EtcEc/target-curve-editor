@@ -143,6 +143,16 @@ describe('applyCurveToAdy with per-channel trims', () => {
     expect(pointsOf(result, 'SW1')).toEqual(pointsOf(plain, 'SW1'));
   });
 
+  it('adds the trim to the raw designed curve when cancelHfKnee is false, leaving other channels alone', () => {
+    const noCancel: CurveParams = { ...params, cancelHfKnee: false };
+    const result = applyCurveToAdy(threeChannelAdy(), noCancel, new Map([['FL', trim]]));
+    const fl = pointsOf(result, 'FL');
+    const fr = pointsOf(result, 'FR');
+    expect(fl[fl.length - 1]).toBe(`{20000.0, ${(writtenGain(20000, noCancel) - 1.5).toFixed(3)}}`);
+    expect(fr[fr.length - 1]).toBe(`{20000.0, ${writtenGain(20000, noCancel).toFixed(3)}}`);
+    expect(writtenGain(20000, noCancel)).toBeCloseTo(designGain(20000, noCancel), 9);
+  });
+
   it('leaves the subwoofer trim shift untouched', () => {
     const plain = applyCurveToAdy(threeChannelAdy(), params);
     const result = applyCurveToAdy(threeChannelAdy(), params, new Map([['FL', trim]]));

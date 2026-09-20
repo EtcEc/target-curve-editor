@@ -62,6 +62,12 @@ export function parseCorrection(text: string): CorrectionFile {
   for (let i = 1; i < freq.length; i++) {
     if (freq[i] <= freq[i - 1]) throw new CorrectionValidationError('"freq" must be strictly ascending');
   }
+  const grid = logGrid();
+  if (freq.length !== grid.length || freq.some((f, i) => Math.abs(f - grid[i]) > 1e-6 * grid[i])) {
+    throw new CorrectionValidationError(
+      `"freq" must be the shared ${grid.length}-point 20 Hz\u201320 kHz grid (24 points/octave)`
+    );
+  }
 
   if (!isObject(raw.channels)) throw new CorrectionValidationError('"channels" must be an object');
   const channels: Record<string, CorrectionChannel> = {};
@@ -95,6 +101,9 @@ const FADE_WIDTH_OCTAVES = 1;
  * trim up by log-frequency interpolation between `freq` points.
  */
 export function trimFromError(error: readonly number[], freq: readonly number[], cutoffHz: number): TrimFn {
+  if (!Number.isFinite(cutoffHz) || cutoffHz <= 0) {
+    throw new Error(`Cutoff must be a positive finite frequency, got ${cutoffHz}`);
+  }
   const n = error.length;
   const trims = error.map((_, i) => {
     let sum = 0;

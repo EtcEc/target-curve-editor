@@ -67,6 +67,15 @@ describe('parseCorrection validation', () => {
     expect(() => parseWith((raw) => ([raw.freq[3], raw.freq[4]] = [raw.freq[4], raw.freq[3]]))).toThrow(/ascending/);
   });
 
+  it('rejects a valid-but-different freq grid', () => {
+    expect(() =>
+      parseWith((raw) => {
+        raw.freq = [20, 200, 2000, 20000];
+        raw.channels.FL.error = [0, 0, 0, 0];
+      })
+    ).toThrow(/shared .*-point 20 Hz/);
+  });
+
   it('rejects non-finite or non-positive frequencies', () => {
     expect(() => parseWith((raw) => (raw.freq[0] = -5))).toThrow(CorrectionValidationError);
     expect(() => parseWith((raw) => (raw.freq[2] = 'x'))).toThrow(CorrectionValidationError);
@@ -93,6 +102,12 @@ describe('parseCorrection validation', () => {
 describe('trimFromError', () => {
   const freq = logGrid();
   const flat = (v: number) => freq.map(() => v);
+
+  it('rejects a cutoff that is not a positive finite number', () => {
+    for (const bad of [0, -1, NaN, Infinity]) {
+      expect(() => trimFromError(flat(1), freq, bad)).toThrow(/cutoff/i);
+    }
+  });
 
   it('defaults the cutoff to 2 kHz', () => {
     expect(DEFAULT_CUTOFF_HZ).toBe(2000);

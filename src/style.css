@@ -85,3 +85,7 @@ details details {
   display: block;
   margin: 0.5rem 0;
 }
+
+#correction-cutoff:invalid {
+  outline: 2px solid #f66;
+}
