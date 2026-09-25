@@ -44,6 +44,26 @@
           <p id="sub-trim-notice" class="warning" hidden></p>
         </fieldset>
 
+        <div id="bands">
+          <h3>Curve bands</h3>
+          <div id="band-toolbar">
+            <label>
+              Preset
+              <select id="preset-select">
+                <option value="">Load preset…</option>
+              </select>
+            </label>
+            <span id="add-band-group">
+              <select id="add-band-type"></select>
+              <button type="button" id="add-band">Add band</button>
+            </span>
+          </div>
+          <p id="preset-description" class="hint"></p>
+          <div id="band-list"></div>
+          <p id="band-error" class="error" hidden></p>
+          <p id="band-level" class="hint"></p>
+        </div>
+
         <div id="chart"></div>
 
         <table id="channel-summary">

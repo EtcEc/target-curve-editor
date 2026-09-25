@@ -8,6 +8,8 @@ import {
   AdyValidationError,
   type AdyFile,
 } from './ady';
+import { initBandsUi } from './bandsUi';
+import { sumBands, validateBands } from './bands';
 import { createChart, updateChart } from './chart';
 import { initCorrectionUi } from './correctionUi';
 import { buildDownloadSummary, buildFilenameSuffix } from './downloadSummary';
@@ -43,6 +45,9 @@ const editorPlaceholder = document.getElementById('editor-placeholder') as HTMLE
 const downloadPlaceholder = document.getElementById('download-placeholder') as HTMLElement;
 const downloadButton = document.getElementById('download') as HTMLButtonElement;
 const correctionUi = initCorrectionUi(() => onParamsChanged());
+const bandError = document.getElementById('band-error') as HTMLElement;
+const bandLevel = document.getElementById('band-level') as HTMLElement;
+const bandsUi = initBandsUi(params, () => onParamsChanged());
 
 function showError(message: string): void {
   errorMessage.textContent = message;
@@ -100,6 +105,8 @@ function loadFile(file: File): void {
       } else {
         updateChart(chart, params);
       }
+      bandsUi.render();
+      onParamsChanged();
     } catch (err) {
       currentAdy = null;
       if (err instanceof AdyValidationError) {
@@ -152,6 +159,12 @@ function renderDownloadSummary(): void {
 }
 
 function onParamsChanged(): void {
+  const problem = validateBands(params.bands);
+  bandError.textContent = problem ?? '';
+  bandError.hidden = problem === null;
+  downloadButton.disabled = problem !== null;
+  if (problem !== null) return; // keep the last good chart; nothing is exported meanwhile
+  bandLevel.textContent = `Level at 20 Hz: ${sumBands(20, params.bands).toFixed(2)} dB`;
   if (chart) updateChart(chart, params);
   if (currentAdy) {
     renderChannelSummary();
@@ -194,6 +207,7 @@ subTrimInput.addEventListener('change', () => {
 
 downloadButton.addEventListener('click', () => {
   if (!currentAdy) return;
+  if (validateBands(params.bands) !== null) return;
   const trims = correctionUi.getTrims();
   const result = applyCurveToAdy(currentAdy, params, trims);
   const text = serializeAdy(result);
@@ -211,3 +225,5 @@ downloadButton.addEventListener('click', () => {
   a.click();
   URL.revokeObjectURL(url);
 });
+
+onParamsChanged();
