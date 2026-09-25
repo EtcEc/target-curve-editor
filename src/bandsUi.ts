@@ -36,7 +36,10 @@ function fieldsFor(type: BandType): FieldSpec[] {
  * every valid number typed (an empty or non-numeric field is ignored, keeping
  * the last value); structural changes (add, delete, preset) re-render the rows.
  */
-export function initBandsUi(params: CurveParams, onChange: () => void): { render(): void } {
+export function initBandsUi(
+  params: CurveParams,
+  onChange: () => void
+): { render(): void; setNote(text: string): void } {
   const list = el<HTMLElement>('band-list');
   const presetSelect = el<HTMLSelectElement>('preset-select');
   const presetDescription = el<HTMLElement>('preset-description');
@@ -155,5 +158,5 @@ export function initBandsUi(params: CurveParams, onChange: () => void): { render
   });
 
   render();
-  return { render };
+  return { render, setNote: (text: string) => (presetDescription.textContent = text) };
 }

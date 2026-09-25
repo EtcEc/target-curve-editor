@@ -59,12 +59,36 @@
             </span>
           </div>
           <p id="preset-description" class="hint"></p>
+          <div id="design-file-row">
+            <label>
+              Design name
+              <input type="text" id="design-name" placeholder="e.g. My target" maxlength="60" />
+            </label>
+            <button type="button" id="design-save">Save design</button>
+            <label class="file-pick">
+              Load design
+              <input type="file" id="design-load" accept=".json,application/json" />
+            </label>
+          </div>
+          <p id="design-file-error" class="error" hidden></p>
           <div id="band-list"></div>
           <p id="band-error" class="error" hidden></p>
           <p id="band-level" class="hint"></p>
         </div>
 
         <div id="chart"></div>
+        <p class="hint">
+          Drag a shelf or bell handle on the chart to move it; scroll over a handle to change its Q.
+        </p>
+
+        <div id="slots">
+          <h3>Compare</h3>
+          <p class="hint">
+            Save the current design into a slot to see it drawn faintly on the chart while you keep editing.
+            Load a slot to make it the design you edit and download.
+          </p>
+          <div id="slot-list"></div>
+        </div>
 
         <table id="channel-summary">
           <thead>
@@ -100,6 +124,7 @@
             Cutoff (Hz)
             <input type="number" id="correction-cutoff" min="200" max="18000" step="100" value="2000" />
           </label>
+          <h4 class="table-heading">Trim per speaker</h4>
           <table id="correction-summary">
             <thead>
               <tr>
@@ -112,6 +137,7 @@
           </table>
           <p id="correction-notice" class="warning" hidden></p>
           <p id="generate-warnings" class="warning" hidden></p>
+          <h4 id="generate-report-heading" class="table-heading" hidden>Just generated: error per speaker</h4>
           <table id="generate-report" hidden>
             <thead>
               <tr>
@@ -140,17 +166,18 @@
         <button id="generate-close" type="button" aria-label="Close">Close</button>
       </div>
       <p class="hint">
-        Load the base .ady in step 1 (raw, what you edit and export). Here, pick the .ady you measured with:
-        the one saved from the calibration you measured, which carries the target curve. It tells the tool
-        what each speaker was aiming for.
+        This works without step 1: the correction describes your speakers, not any target curve. Pick the .ady
+        whose filters were loaded on the AVR when you took the REW sweeps. It tells the tool what each speaker
+        was aiming for, including which HF rolloff it used.
       </p>
       <p class="hint">
         Then add the REW text exports for each speaker (about 3 positions each is plenty) and generate.
       </p>
       <label>
-        The .ady you measured with
+        The .ady loaded on the AVR for these sweeps
         <input type="file" id="measured-ady-input" accept=".ady" />
       </label>
+      <p id="measured-type-note" class="hint" hidden></p>
       <p id="generate-error" class="error" hidden></p>
       <div id="generate-rows"></div>
       <label>

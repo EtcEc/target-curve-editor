@@ -147,10 +147,18 @@ button {
 }
 
 .dialog-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
+  /* stays in view when the dialog scrolls; the negative margin cancels the dialog's own padding */
+  margin: -1rem -1.25rem 0.5rem;
+  padding: 1rem 1.25rem 0.5rem;
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
 }
 
 .dialog-header h2 {
@@ -232,4 +240,94 @@ button {
 
 .band-fields input {
   width: 7rem;
+}
+
+#design-file-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: end;
+  margin: 0.5rem 0;
+}
+
+#design-file-row label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  color: #ccc;
+}
+
+#design-name {
+  width: 14rem;
+}
+
+#slots h3 {
+  margin-bottom: 0.25rem;
+}
+
+.slot {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.3rem 0;
+}
+
+.slot-swatch {
+  display: inline-block;
+  width: 1.5rem;
+  height: 0.35rem;
+  border-radius: 2px;
+}
+
+.slot strong {
+  min-width: 1rem;
+}
+
+.slot-status {
+  min-width: 5rem;
+  color: #aaa;
+  font-size: 0.9rem;
+}
+
+.slot button {
+  font-size: 0.9rem;
+  padding: 0.25rem 0.7rem;
+}
+
+.handle-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.band-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  box-sizing: border-box;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #e33;
+  box-shadow: 0 0 0 1px #000;
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.band-handle:hover,
+.band-handle.dragging {
+  background: #fff;
+  border-color: #e33;
+}
+
+.band-handle.dragging {
+  cursor: grabbing;
+}
+
+.table-heading {
+  margin: 1rem 0 0.25rem;
+  font-size: 0.95rem;
+  color: #ccc;
 }

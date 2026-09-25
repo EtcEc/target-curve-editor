@@ -9,13 +9,15 @@ import {
   type AdyFile,
 } from './ady';
 import { initBandsUi } from './bandsUi';
-import { sumBands, validateBands } from './bands';
-import { createChart, updateChart } from './chart';
+import { sumBands, validateBands, type Band } from './bands';
+import { createChart, slotCurveData, updateChart } from './chart';
 import { initCorrectionUi } from './correctionUi';
+import { initDesignUi } from './designUi';
 import { buildDownloadSummary, buildFilenameSuffix } from './downloadSummary';
 import { computeTrimShift, type CurveParams } from './curve';
 import { DEFAULT_PRESET_NAME, presetBands } from './presets';
 import { isRolloffType } from './rolloff';
+import { SLOT_IDS, createSlots } from './slots';
 
 let currentAdy: AdyFile | null = null;
 let chart: ReturnType<typeof createChart> | null = null;
@@ -48,6 +50,21 @@ const correctionUi = initCorrectionUi(() => onParamsChanged());
 const bandError = document.getElementById('band-error') as HTMLElement;
 const bandLevel = document.getElementById('band-level') as HTMLElement;
 const bandsUi = initBandsUi(params, () => onParamsChanged());
+const slots = createSlots();
+
+/** Swaps in a whole new design (preset-like), refreshing the rows, the cancel checkbox and the page. */
+function replaceDesign(bands: Band[], cancelRolloff: boolean | undefined, note: string): void {
+  params.bands = bands;
+  if (cancelRolloff !== undefined) {
+    params.cancelRolloff = cancelRolloff;
+    cancelRolloffInput.checked = cancelRolloff;
+  }
+  bandsUi.setNote(note);
+  bandsUi.render();
+  onParamsChanged();
+}
+
+initDesignUi({ params, slots, replaceDesign, onSlotsChanged: () => onParamsChanged() });
 
 function showError(message: string): void {
   errorMessage.textContent = message;
@@ -98,7 +115,16 @@ function loadFile(file: File): void {
       downloadSection.hidden = false;
       editorPlaceholder.hidden = true;
       downloadPlaceholder.hidden = true;
-      if (!chart) chart = createChart(chartContainer, params);
+      if (!chart) {
+        chart = createChart(chartContainer, params, {
+          // a handle drag edits params.bands in place: sync the rows and everything else
+          onBandsDragged: () => {
+            bandsUi.setNote('');
+            bandsUi.render();
+            onParamsChanged();
+          },
+        });
+      }
       bandsUi.render();
       onParamsChanged();
     } catch (err) {
@@ -166,7 +192,7 @@ function onParamsChanged(): void {
     return;
   }
   bandLevel.textContent = `Level at 20 Hz: ${sumBands(20, params.bands).toFixed(2)} dB`;
-  if (chart) updateChart(chart, params);
+  if (chart) updateChart(chart, params, SLOT_IDS.map((id) => slotCurveData(slots.get(id), params)));
   if (currentAdy) {
     renderChannelSummary();
     renderDownloadSummary();

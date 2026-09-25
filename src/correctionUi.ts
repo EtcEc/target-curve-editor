@@ -75,6 +75,8 @@ export function initCorrectionUi(onChange: () => void): CorrectionUi {
   const generateButton = el<HTMLButtonElement>('generate-button');
   const generateWarnings = el<HTMLElement>('generate-warnings');
   const reportTable = el<HTMLElement>('generate-report');
+  const reportHeading = el<HTMLElement>('generate-report-heading');
+  const typeNote = el<HTMLElement>('measured-type-note');
   const reportBody = query<HTMLElement>('#generate-report tbody');
 
   const dialog = el<HTMLDialogElement>('generate-dialog');
@@ -145,12 +147,14 @@ export function initCorrectionUi(onChange: () => void): CorrectionUi {
       reportBody.appendChild(tr);
     }
     reportTable.hidden = false;
+    reportHeading.hidden = false;
     show(generateWarnings, result.warnings.length > 0 ? result.warnings.join(' ') : null);
   }
 
   function clearReport(): void {
     reportBody.innerHTML = '';
     reportTable.hidden = true;
+    reportHeading.hidden = true;
     show(generateWarnings, null);
   }
 
@@ -200,6 +204,7 @@ export function initCorrectionUi(onChange: () => void): CorrectionUi {
     const file = measuredInput.files?.[0];
     measuredAdy = null;
     rows.innerHTML = '';
+    show(typeNote, null);
     clearReport();
     if (!file) {
       updateGenerateEnabled();
@@ -207,8 +212,9 @@ export function initCorrectionUi(onChange: () => void): CorrectionUi {
     }
     try {
       const parsed = parseAdy(await file.text());
-      checkMeasuredType(parsed);
+      const type = checkMeasuredType(parsed);
       measuredAdy = parsed;
+      show(typeNote, `Read from this file: High Frequency Roll Off ${type}.`);
       show(generateError, null);
       buildRows(parsed);
     } catch (err) {
