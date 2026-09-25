@@ -12,8 +12,8 @@ unchanged.
 
 ## Scope and phasing
 
-- **Phase 1** (this spec's first implementation plan): band model, new bass
-  shelf controls, presets, both HF rolloff types, rolloff shown on the chart,
+- **Phase 1** (this spec's first implementation plan): band model (tilt, low/high
+  shelf, bell), presets, both HF rolloff types, rolloff shown on the chart,
   sub trim option with detection.
 - **Phase 2** (its own plan later): draggable handles on the chart, saved compare
   slots, saving/loading a design as a file.
@@ -22,57 +22,54 @@ Both phases are specified here so Phase 1 makes room for Phase 2.
 
 ## Curve model
 
-The design curve `design(f)` is built from a list of bands. Default design
-(and the regression baseline): bass shelf 4.5 dB (plateau to 40 Hz, rolloff
-to 100 Hz, softness 1) + tilt 0.7 dB/oct around 1 kHz.
+The design curve `design(f)` is the plain sum of a list of bands, each a
+standard, well-understood filter response in dB. No band changes how another
+one behaves.
 
 Band types:
 
 - **Tilt**: `slope` (dB/oct, positive = falling), `pivot` (Hz, default 1000),
   optional range `fLow`/`fHigh` (default 20/20000 = unlimited). The value is
   `slope * log2(pivot / clamp(f, fLow, fHigh))`, i.e. it holds its edge value
-  outside the range (continuous, no step).
+  outside the range (continuous, no step). Setting `fLow` is how a bass plateau
+  is made: the tilt stops rising below `fLow`.
 - **Low shelf** and **high shelf**: `gain` (dB), `freq` (Hz), `q` (default 0.707).
   Magnitude of the standard (RBJ cookbook) analog shelving prototype at `f`.
 - **Bell**: `gain` (dB), `freq` (Hz), `q`. Magnitude of the standard analog
   peaking prototype at `f`.
-- **Bass shelf** (at most one): the current shelf, generalised. Parameters:
-  `gain` (plateau level, dB), `plateauEnd` (Hz, default 40), `rolloffEnd` (Hz,
-  default 100), `softness` (0..1, default 1).
 
-Tilt, low/high shelf and bell bands are **additive**: their responses sum into
-`rest(f)`.
+`design(f)` is the sum of the enabled bands. Every band can be switched off
+without deleting it. Values must be finite; out-of-range input is clamped or
+refused by the field, never applied silently. The number and order of bands is
+free (any number of each type).
 
-The **bass shelf is not additive** (deliberate; an additive shelf was rejected
-earlier because it stacks with the tilt). It crossfades between its plateau and
-`rest(f)`:
-
-```
-u(f)  = clamp(log2(f / plateauEnd) / log2(rolloffEnd / plateauEnd), 0, 1)
-w(f)  = (1 - softness) * u + softness * smoothstep(u)
-design(f) = gain * (1 - w) + rest(f) * w        // with a bass shelf
-design(f) = rest(f)                             // without one
-```
-
-Below `plateauEnd` the design is the plateau, above `rolloffEnd` it is `rest`.
-`softness = 1` is exactly today's shape (smoothstep); `softness = 0` is a straight
-crossfade in log-frequency, i.e. sharp knees and a constant dB/octave rolloff
-between the two frequencies. `rolloffEnd` (e.g. 100 vs 150 Hz) sets how far up
-the shelf reaches. The effective rolloff slope is shown as a read-only value.
-Validation: `plateauEnd < rolloffEnd`, both within 20–20000 Hz.
-
-Every band can be switched off without deleting it. Values must be finite;
-out-of-range input is clamped or refused by the field, never applied silently.
+The default design (what the page starts with) is the "Current (approximated)"
+preset below. A read-only line under the band list shows "Level at 20 Hz"
+(the sum of the bands at 20 Hz) so the bass level is visible as a single number
+even though it is spread over a tilt and a shelf. A knee's sharpness is the
+shelf's Q; how far the bass lift reaches is the shelf's frequency and the tilt's
+`fLow`.
 
 ## Presets
 
 A preset is a saved band list. Loading one replaces the band list with editable
-bands. Shipped in Phase 1: **Flat**, **Current** (the default design above), and
-approximate literature curves (a Harman-style and a B&K-style in-room target).
-Rules:
+bands. Shipped in Phase 1:
 
-- Non-trivial presets are labelled "approximate" and cite their source in their
-  description; each is fitted to the published shape once and stored as bands.
+- **Flat**: no bands.
+- **Current (approximated)**: the setup the tool had before bands
+  (0.7 dB/oct tilt around 1 kHz, 4.5 dB bass shelf, plateau to 40 Hz, blending
+  into the tilt by 100 Hz), expressed with standard filters: Tilt 0.7 dB/oct,
+  pivot 1000 Hz, `fLow` 50 Hz; Low shelf +1.43 dB at 66.5 Hz, Q 0.90. It stays
+  within 0.075 dB of the previous shape everywhere from 20 Hz to 20 kHz and is
+  exactly 4.50 dB at 20 Hz. The fit was made by least squares against the previous
+  model; the previous shape (a smoothstep crossfade between a plateau and the
+  tilt) no longer exists in the tool.
+- Approximate literature curves (a Harman-style and a B&K-style in-room target).
+
+Rules for the literature presets:
+
+- They are labelled "approximate" and cite their source in their description;
+  each is fitted to the published shape once and stored as bands.
 - A preset is shipped only if its source can be cited and its reference points
   can be reproduced within 0.5 dB by the bands; otherwise it is not shipped.
 - User-made presets are Phase 2 (saved designs).
@@ -135,16 +132,19 @@ export always uses the active design), and Save/Load design as a small JSON file
 
 ## Constants and compatibility
 
-- Default design must reproduce today's output to within 1e-9 dB at every
-  written point (regression test against the current `designGain`/`writtenGain`),
-  for both `cancelHfKnee` settings, with Roll Off 2.
+- The default design (the "Current (approximated)" preset) must stay within
+  0.1 dB of the previous `designGain` at every point of the write grid
+  (regression test against a copy of the old formula kept in the test file), for
+  both `cancelHfKnee` settings with Roll Off 2. The old formula is not kept in
+  the app.
 - Shared write grid, HF-knee cancellation logic, sub trim shift logic,
   measured-correction trims and their maths are unchanged.
 - No new dependencies.
 
 ## Errors
 
-Invalid band values, a bass shelf with `plateauEnd >= rolloffEnd`, or an
+Invalid band values (non-finite numbers, a tilt with `fLow >= fHigh`, a non-positive
+frequency or Q), or an
 unrecognised rolloff type in the loaded file are visible messages; nothing is
 exported from an invalid design.
 
@@ -152,10 +152,11 @@ exported from an invalid design.
 
 Test-first, synthetic data only (repo is public).
 
-- Band maths: each type's value at known points (tilt at pivot = 0, shelf far
-  above/below, bell at centre = gain), sum of additive bands, bass shelf blend
-  endpoints and softness 0/1.
-- Regression: default design equals the current implementation.
+- Band maths: each type's value at known points (tilt at pivot = 0 and holding
+  its value outside `fLow`/`fHigh`, shelf far above/below and half its gain
+  (in dB) at its own frequency for Q 0.707, bell at centre = gain), the sum of
+  bands, disabled bands ignored.
+- Regression: the default design stays within 0.1 dB of the previous formula.
 - Rolloff: both tables at knot values and interpolation; type selection from
   `enTargetCurveType`; chart function with cancel on/off; exported
   `enTargetCurveType` follows the selection.
@@ -172,6 +173,7 @@ Test-first, synthetic data only (repo is public).
 ## Non-goals
 
 - Per-channel design curves; automatic fitting of a curve from a measurement;
-  more than one bass shelf; exact reproduction of literature curves; the ~2 kHz
+  a dedicated non-standard bass shelf type; exact reproduction of literature
+  curves; the ~2 kHz
   midrange compensation flag; anything on the measured-correction side beyond
   accepting both rolloff types.
