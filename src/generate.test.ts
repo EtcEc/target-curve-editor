@@ -60,7 +60,7 @@ describe('generateCorrection', () => {
     expect(Object.keys(correction.channels)).toEqual(['FL']);
   });
 
-  it('refuses a measured .ady that is not enTargetCurveType 2', () => {
+  it('refuses a measured .ady with an unsupported enTargetCurveType', () => {
     const ady = measuredAdy();
     ady.enTargetCurveType = 0;
     expect(() => generateCorrection(ady, [{ commandId: 'FL', files: [file('L1.txt')] }], '')).toThrow(GenerateError);

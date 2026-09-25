@@ -1,13 +1,6 @@
 import { sumBands, type Band } from './bands';
 import { rolloffGain, type RolloffType } from './rolloff';
 
-const PIVOT_FREQ = 1000;
-
-/** Down-tilt gain in dB at `freq`, `slope` dB/octave, 0dB at 1kHz. */
-export function tilt(freq: number, slope: number): number {
-  return slope * Math.log2(PIVOT_FREQ / freq);
-}
-
 /**
  * Frequency grid matching the original Python scripts: 1Hz steps from
  * 20-200Hz, 10Hz steps from 200-20000Hz, always ending exactly at 20000.

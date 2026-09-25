@@ -95,6 +95,9 @@ export function sumBands(freq: number, bands: readonly Band[]): number {
   return total;
 }
 
+/** 100 log-spaced frequencies from 20 Hz to 20 kHz, used to catch values that overflow. */
+const CHECK_GRID: readonly number[] = Array.from({ length: 100 }, (_, i) => 20 * 1000 ** (i / 99));
+
 /** A message describing the first problem in `bands`, or null when they are all usable. */
 export function validateBands(bands: readonly Band[]): string | null {
   for (let i = 0; i < bands.length; i++) {
@@ -112,6 +115,13 @@ export function validateBands(bands: readonly Band[]): string | null {
       if (band.freq <= 0) return `${where}: frequency must be above 0 Hz.`;
       if (band.q <= 0) return `${where}: Q must be above 0.`;
     }
+    // Finite, positive values can still overflow (10 ** (gain / 40), x * x) into NaN/Infinity.
+    if (CHECK_GRID.some((f) => !Number.isFinite(bandGain(f, band)))) {
+      return `${where}: these values give an unusable curve (try a smaller gain or a sensible frequency or Q).`;
+    }
+  }
+  if (CHECK_GRID.some((f) => !Number.isFinite(sumBands(f, bands)))) {
+    return 'The band values give an unusable curve (try a smaller gain or a sensible frequency or Q).';
   }
   return null;
 }

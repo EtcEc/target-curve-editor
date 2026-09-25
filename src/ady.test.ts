@@ -98,7 +98,7 @@ describe('applyCurveToAdy', () => {
     expect(result.title).toBe('Sample');
   });
 
-  it('writes the raw designed curve (no knee cancellation) when cancelHfKnee is false', () => {
+  it('writes the raw designed curve (no knee cancellation) when cancelRolloff is false', () => {
     const noCancel = { ...params, cancelRolloff: false };
     const result = applyCurveToAdy(createSampleAdy(), noCancel);
     const points = result.detectedChannels[0].customTargetCurvePoints;
@@ -151,7 +151,7 @@ describe('applyCurveToAdy with per-channel trims', () => {
     expect(pointsOf(result, 'SW1')).toEqual(pointsOf(plain, 'SW1'));
   });
 
-  it('adds the trim to the raw designed curve when cancelHfKnee is false, leaving other channels alone', () => {
+  it('adds the trim to the raw designed curve when cancelRolloff is false, leaving other channels alone', () => {
     const noCancel = { ...params, cancelRolloff: false };
     const result = applyCurveToAdy(threeChannelAdy(), noCancel, new Map([['FL', trim]]));
     const fl = pointsOf(result, 'FL');

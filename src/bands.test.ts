@@ -147,6 +147,17 @@ describe('validateBands', () => {
     expect(validateBands([bell({ q: 0 })])).toMatch(/Q/);
     expect(validateBands([bell({ freq: -5 })])).not.toBeNull();
   });
+
+  it('refuses finite values that overflow into an unusable curve, naming the band', () => {
+    expect(validateBands([tilt(), shelf('lowShelf', { gain: 13000 })])).toMatch(/Band 2 \(Low shelf\).*unusable curve/);
+    expect(validateBands([bell({ freq: 1e-200 })])).toMatch(/Band 1 \(Bell\).*unusable curve/);
+    expect(validateBands([bell(), bell({ q: 1e-200 })])).toMatch(/Band 2 \(Bell\).*unusable curve/);
+  });
+
+  it('still accepts extreme but sensible values', () => {
+    expect(validateBands([shelf('lowShelf', { gain: 30 }), shelf('highShelf', { gain: -30 })])).toBeNull();
+    expect(validateBands([bell({ gain: 30, q: 0.05 }), bell({ gain: -30, q: 20 })])).toBeNull();
+  });
 });
 
 describe('defaultBand', () => {

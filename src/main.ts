@@ -32,7 +32,7 @@ const fileInput = document.getElementById('file-input') as HTMLInputElement;
 const errorMessage = document.getElementById('error-message') as HTMLElement;
 const editor = document.getElementById('editor') as HTMLElement;
 const chartContainer = document.getElementById('chart') as HTMLElement;
-const cancelHfKneeInput = document.getElementById('cancel-hf-knee') as HTMLInputElement;
+const cancelRolloffInput = document.getElementById('cancel-rolloff') as HTMLInputElement;
 const rolloffTypeSelect = document.getElementById('rolloff-type') as HTMLSelectElement;
 const rolloffNotice = document.getElementById('rolloff-notice') as HTMLElement;
 const subTrimInput = document.getElementById('sub-trim') as HTMLInputElement;
@@ -188,8 +188,8 @@ dropzone.addEventListener('drop', (event) => {
   if (file) loadFile(file);
 });
 
-cancelHfKneeInput.addEventListener('change', () => {
-  params.cancelRolloff = cancelHfKneeInput.checked;
+cancelRolloffInput.addEventListener('change', () => {
+  params.cancelRolloff = cancelRolloffInput.checked;
   onParamsChanged();
 });
 
