@@ -32,7 +32,7 @@ function downloadJson(filename: string, text: string): void {
 }
 
 /** Save/load a design as a file, and the three compare slots. */
-export function initDesignUi(host: DesignUiHost): { refreshSlots(): void } {
+export function initDesignUi(host: DesignUiHost): { refreshSlots(): void; clearError(): void } {
   const nameInput = el<HTMLInputElement>('design-name');
   const saveButton = el<HTMLButtonElement>('design-save');
   const loadInput = el<HTMLInputElement>('design-load');
@@ -134,5 +134,5 @@ export function initDesignUi(host: DesignUiHost): { refreshSlots(): void } {
   }
 
   refreshSlots();
-  return { refreshSlots };
+  return { refreshSlots, clearError: () => showError(null) };
 }

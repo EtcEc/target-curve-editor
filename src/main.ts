@@ -65,7 +65,7 @@ function replaceDesign(bands: Band[], cancelRolloff: boolean | undefined, note: 
   onParamsChanged();
 }
 
-initDesignUi({ params, slots, replaceDesign, onSlotsChanged: () => onParamsChanged() });
+const designUi = initDesignUi({ params, slots, replaceDesign, onSlotsChanged: () => onParamsChanged() });
 
 function showError(message: string): void {
   errorMessage.textContent = message;
@@ -203,6 +203,7 @@ function onParamsChanged(): void {
     renderChannelSummary();
     return;
   }
+  designUi.clearError(); // a "fix the band values" message from saving no longer applies
   renderSubTrimPeak();
   bandLevel.textContent = `Level at 20 Hz: ${sumBands(20, params.bands).toFixed(2)} dB`;
   if (chart) updateChart(chart, params, SLOT_IDS.map((id) => slotCurveData(slots.get(id), params)));
