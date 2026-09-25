@@ -57,6 +57,11 @@ export function resultGain(freq: number, params: CurveParams): number {
   return writtenGain(freq, params) + rolloffGain(params.rolloffType, freq);
 }
 
+/** What the chart adds to the design curve: nothing when the rolloff is cancelled, the rolloff itself when it is left on. */
+export function chartOffset(freq: number, params: CurveParams): number {
+  return params.cancelRolloff ? 0 : rolloffGain(params.rolloffType, freq);
+}
+
 /**
  * The amount Audyssey will shift a subwoofer's curve down to normalize its
  * max to 0dB -- and therefore the trim boost needed to restore the

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeTrimShift, designGain, frequencyGrid, resultGain, writtenGain } from './curve';
+import { chartOffset, computeTrimShift, designGain, frequencyGrid, resultGain, writtenGain } from './curve';
 import { rolloffGain } from './rolloff';
 import { testParams, tiltBands } from './fixtures/testParams';
 
@@ -77,5 +77,21 @@ describe('computeTrimShift', () => {
     const one = computeTrimShift(testParams({ bands: high, rolloffType: 1 }));
     const two = computeTrimShift(testParams({ bands: high, rolloffType: 2 }));
     expect(one).not.toBeCloseTo(two, 3);
+  });
+});
+
+describe('chartOffset', () => {
+  it('is 0 when the rolloff is cancelled and the rolloff itself when it is left on', () => {
+    expect(chartOffset(15000, testParams({ cancelRolloff: true }))).toBe(0);
+    expect(chartOffset(15000, testParams({ cancelRolloff: false, rolloffType: 1 }))).toBe(rolloffGain(1, 15000));
+  });
+
+  it('makes the plotted curve design + offset', () => {
+    for (const cancelRolloff of [true, false]) {
+      const params = testParams({ cancelRolloff, rolloffType: 2 });
+      for (const f of [30, 500, 4000, 18000]) {
+        expect(resultGain(f, params)).toBeCloseTo(designGain(f, params) + chartOffset(f, params), 9);
+      }
+    }
   });
 });
