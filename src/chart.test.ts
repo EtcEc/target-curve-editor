@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { chartFrequencies, designCurveData } from './chart';
-import type { CurveParams } from './curve';
+import { chartFrequencies, resultCurveData } from './chart';
+import { rolloffGain } from './rolloff';
+import { testParams, tiltBands } from './fixtures/testParams';
 
 describe('chartFrequencies', () => {
   it('spans 20Hz to 20000Hz', () => {
@@ -17,16 +18,14 @@ describe('chartFrequencies', () => {
   });
 });
 
-describe('designCurveData', () => {
+describe('resultCurveData', () => {
   it('returns matching-length frequency and gain arrays', () => {
-    const params: CurveParams = { slope: 3, shelfEnabled: false, shelfGain: 0 };
-    const [freqs, gains] = designCurveData(params);
+    const [freqs, gains] = resultCurveData(testParams({ bands: tiltBands(3) }));
     expect(freqs.length).toBe(gains.length);
   });
 
   it('gain near 1kHz is close to 0 for a pure tilt', () => {
-    const params: CurveParams = { slope: 3, shelfEnabled: false, shelfGain: 0 };
-    const [freqs, gains] = designCurveData(params);
+    const [freqs, gains] = resultCurveData(testParams({ bands: tiltBands(3) }));
     let nearestIdx = 0;
     let nearestDist = Infinity;
     freqs.forEach((f, i) => {
@@ -37,5 +36,13 @@ describe('designCurveData', () => {
       }
     });
     expect(gains[nearestIdx]).toBeCloseTo(0, 0);
+  });
+
+  it('shows the design when the rolloff is cancelled and design + rolloff when it is not', () => {
+    const cancelled = resultCurveData(testParams({ bands: tiltBands(0), cancelRolloff: true }));
+    const shown = resultCurveData(testParams({ bands: tiltBands(0), cancelRolloff: false, rolloffType: 1 }));
+    const last = cancelled[0].length - 1;
+    expect(cancelled[1][last]).toBeCloseTo(0, 9);
+    expect(shown[1][last]).toBeCloseTo(rolloffGain(1, shown[0][last]), 9);
   });
 });

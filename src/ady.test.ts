@@ -51,11 +51,12 @@ describe('isSubwooferChannel', () => {
   });
 });
 
-import { applyCurveToAdy, hasAppliedTrims, serializeAdy } from './ady';
-import { computeTrimShift, designGain, frequencyGrid, writtenGain, type CurveParams, type TrimFn } from './curve';
+import { applyCurveToAdy, hasAppliedTrims, looksAlreadyProcessed, serializeAdy } from './ady';
+import { computeTrimShift, designGain, frequencyGrid, writtenGain, type TrimFn } from './curve';
+import { testParams, tiltBands } from './fixtures/testParams';
 
 describe('applyCurveToAdy', () => {
-  const params: CurveParams = { slope: 3, shelfEnabled: false, shelfGain: 0 };
+  const params = testParams({ bands: tiltBands(3) });
 
   it('writes the same customTargetCurvePoints to every channel', () => {
     const result = applyCurveToAdy(createSampleAdy(), params);
@@ -72,9 +73,16 @@ describe('applyCurveToAdy', () => {
     expect(result.detectedChannels[0].trimAdjustment).toBe('0.500000');
   });
 
-  it('forces enTargetCurveType to 2', () => {
-    const result = applyCurveToAdy(createSampleAdy(), params);
-    expect(result.enTargetCurveType).toBe(2);
+  it('writes the selected rolloff type as enTargetCurveType', () => {
+    expect(applyCurveToAdy(createSampleAdy(), params).enTargetCurveType).toBe(2);
+    expect(applyCurveToAdy(createSampleAdy(), { ...params, rolloffType: 1 }).enTargetCurveType).toBe(1);
+  });
+
+  it('leaves the sub trimAdjustment exactly as it was when subTrim is off', () => {
+    const result = applyCurveToAdy(createSampleAdy(), { ...params, subTrim: false });
+    expect(result.detectedChannels[1].trimAdjustment).toBe('-1.250000');
+    // the curves are still written to every channel
+    expect(result.detectedChannels[1].customTargetCurvePoints).toHaveLength(frequencyGrid().length);
   });
 
   it('does not mutate the input', () => {
@@ -91,7 +99,7 @@ describe('applyCurveToAdy', () => {
   });
 
   it('writes the raw designed curve (no knee cancellation) when cancelHfKnee is false', () => {
-    const noCancel: CurveParams = { ...params, cancelHfKnee: false };
+    const noCancel = { ...params, cancelRolloff: false };
     const result = applyCurveToAdy(createSampleAdy(), noCancel);
     const points = result.detectedChannels[0].customTargetCurvePoints;
     // 20kHz is where the knee is largest (-6.13dB), so cancelled vs raw differ most here
@@ -109,7 +117,7 @@ describe('serializeAdy', () => {
 });
 
 describe('applyCurveToAdy with per-channel trims', () => {
-  const params: CurveParams = { slope: 0.7, shelfEnabled: false, shelfGain: 0 };
+  const params = testParams({ bands: tiltBands(0.7) });
   const trim: TrimFn = (f) => (f >= 5000 ? -1.5 : 0);
 
   function threeChannelAdy() {
@@ -144,7 +152,7 @@ describe('applyCurveToAdy with per-channel trims', () => {
   });
 
   it('adds the trim to the raw designed curve when cancelHfKnee is false, leaving other channels alone', () => {
-    const noCancel: CurveParams = { ...params, cancelHfKnee: false };
+    const noCancel = { ...params, cancelRolloff: false };
     const result = applyCurveToAdy(threeChannelAdy(), noCancel, new Map([['FL', trim]]));
     const fl = pointsOf(result, 'FL');
     const fr = pointsOf(result, 'FR');
@@ -183,5 +191,30 @@ describe('hasAppliedTrims', () => {
   it('is false when only the subwoofer or unknown channels have trims', () => {
     expect(hasAppliedTrims(ady, new Map([['SW1', trim]]))).toBe(false);
     expect(hasAppliedTrims(ady, new Map([['XX', trim]]))).toBe(false);
+  });
+});
+
+describe('looksAlreadyProcessed', () => {
+  it('is false for a raw file with no custom points', () => {
+    expect(looksAlreadyProcessed(createSampleAdy())).toBe(false);
+  });
+
+  it('is true for a file this tool wrote', () => {
+    const written = applyCurveToAdy(createSampleAdy(), testParams());
+    expect(looksAlreadyProcessed(written)).toBe(true);
+    expect(looksAlreadyProcessed(parseAdy(serializeAdy(written)))).toBe(true);
+  });
+
+  it('is false for custom points on some other grid', () => {
+    const ady = createSampleAdy();
+    ady.detectedChannels[0].customTargetCurvePoints = ['{20.0, 0.000}', '{1000.0, 0.000}', '{20000.0, 0.000}'];
+    expect(looksAlreadyProcessed(ady)).toBe(false);
+  });
+
+  it('is false when the point count matches but a frequency does not', () => {
+    const written = applyCurveToAdy(createSampleAdy(), testParams());
+    written.detectedChannels[0].customTargetCurvePoints[500] = '{999.0, 0.000}';
+    written.detectedChannels[1].customTargetCurvePoints = [];
+    expect(looksAlreadyProcessed(written)).toBe(false);
   });
 });

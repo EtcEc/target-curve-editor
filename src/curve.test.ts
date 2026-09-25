@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import { tilt, frequencyGrid, designGain, writtenGain, computeTrimShift, type CurveParams } from './curve';
-import { hfKneeGain } from './hfKnee';
+import { describe, expect, it } from 'vitest';
+import { computeTrimShift, designGain, frequencyGrid, resultGain, tilt, writtenGain } from './curve';
+import { rolloffGain } from './rolloff';
+import { testParams, tiltBands } from './fixtures/testParams';
 
 describe('tilt', () => {
   it('is 0dB at the 1kHz pivot regardless of slope', () => {
@@ -8,11 +9,8 @@ describe('tilt', () => {
     expect(tilt(1000, -3)).toBeCloseTo(0, 6);
   });
 
-  it('boosts below the pivot for positive slope', () => {
+  it('boosts below the pivot and cuts above it for positive slope', () => {
     expect(tilt(500, 6)).toBeCloseTo(6, 6);
-  });
-
-  it('cuts above the pivot for positive slope', () => {
     expect(tilt(2000, 6)).toBeCloseTo(-6, 6);
   });
 });
@@ -30,104 +28,66 @@ describe('frequencyGrid', () => {
     const idx200 = grid.indexOf(200);
     expect(grid[idx200 + 1] - grid[idx200]).toBe(10);
   });
+
+  it('has 2161 points', () => {
+    expect(frequencyGrid()).toHaveLength(2161);
+  });
 });
 
 describe('designGain', () => {
-  it('equals tilt exactly when the shelf is disabled', () => {
-    const params: CurveParams = { slope: 4, shelfEnabled: false, shelfGain: 0 };
-    expect(designGain(300, params)).toBeCloseTo(tilt(300, 4), 9);
+  it('is the sum of the bands', () => {
+    const params = testParams({ bands: tiltBands(3) });
+    expect(designGain(500, params)).toBeCloseTo(tilt(500, 3), 9);
   });
 
-  it('equals shelfGain exactly at and below 40Hz', () => {
-    const params: CurveParams = { slope: 0.7, shelfEnabled: true, shelfGain: 6 };
-    expect(designGain(40, params)).toBeCloseTo(6, 9);
-    expect(designGain(20, params)).toBeCloseTo(6, 9);
-  });
-
-  it('equals tilt exactly at and above 100Hz (shelf has no influence there)', () => {
-    const params: CurveParams = { slope: 0.7, shelfEnabled: true, shelfGain: 6 };
-    expect(designGain(100, params)).toBeCloseTo(tilt(100, 0.7), 9);
-    expect(designGain(200, params)).toBeCloseTo(tilt(200, 0.7), 9);
-  });
-
-  it('actually boosts the low end for a gentle slope (the reported bug)', () => {
-    // at slope=0.7 the tilt alone only reaches ~3.95dB by 20Hz -- nowhere
-    // near a 6dB shelf. The crossfade must still deliver the full 6dB
-    // at/below 40Hz regardless of how gentle the slope is.
-    const params: CurveParams = { slope: 0.7, shelfEnabled: true, shelfGain: 6 };
-    expect(tilt(20, 0.7)).toBeLessThan(4);
-    expect(designGain(20, params)).toBeCloseTo(6, 9);
-  });
-
-  it('blends exactly halfway at the log-frequency midpoint between 40Hz and 100Hz', () => {
-    // smoothstep(0.5) === 0.5, so the geometric mean of the two breakpoints
-    // is where the blend is a plain 50/50 average of shelfGain and tilt(f)
-    const params: CurveParams = { slope: 3, shelfEnabled: true, shelfGain: 6 };
-    const midFreq = Math.sqrt(40 * 100);
-    const expected = (params.shelfGain + tilt(midFreq, params.slope)) / 2;
-    expect(designGain(midFreq, params)).toBeCloseTo(expected, 6);
-  });
-
-  it('matches the reference shape exactly at slope=0: flat shelfGain below 40Hz, flat 0dB above 100Hz', () => {
-    const params: CurveParams = { slope: 0, shelfEnabled: true, shelfGain: 6 };
-    expect(designGain(20, params)).toBeCloseTo(6, 9);
-    expect(designGain(100, params)).toBeCloseTo(0, 9);
-    expect(designGain(20000, params)).toBeCloseTo(0, 9);
-  });
-
-  it('never produces NaN, including at slope=0', () => {
-    const params: CurveParams = { slope: 0, shelfEnabled: true, shelfGain: 6 };
-    for (const freq of [20, 40, 63, 100, 1000, 20000]) {
-      expect(Number.isFinite(designGain(freq, params))).toBe(true);
-    }
+  it('is flat with no bands', () => {
+    expect(designGain(777, testParams({ bands: [] }))).toBe(0);
   });
 });
 
-describe('writtenGain', () => {
-  it('equals designGain minus the HF knee at a point where the knee is non-zero', () => {
-    const params: CurveParams = { slope: 3, shelfEnabled: false, shelfGain: 0 };
-    const expected = designGain(10000, params) - hfKneeGain(10000);
-    expect(writtenGain(10000, params)).toBeCloseTo(expected, 9);
+describe('writtenGain and resultGain', () => {
+  const bands = tiltBands(3);
+
+  it('cancels the selected rolloff in the written curve by default', () => {
+    const params = testParams({ bands, rolloffType: 2 });
+    expect(writtenGain(10000, params)).toBeCloseTo(designGain(10000, params) - rolloffGain(2, 10000), 9);
   });
 
-  it('is unaffected by the HF knee well below the knee (100Hz)', () => {
-    const params: CurveParams = { slope: 3, shelfEnabled: false, shelfGain: 0 };
-    expect(writtenGain(100, params)).toBeCloseTo(designGain(100, params), 3);
+  it('cancels Roll Off 1 when that type is selected', () => {
+    const params = testParams({ bands, rolloffType: 1 });
+    expect(writtenGain(10000, params)).toBeCloseTo(designGain(10000, params) - rolloffGain(1, 10000), 9);
   });
 
-  it('equals designGain exactly when cancelHfKnee is false', () => {
-    const params: CurveParams = { slope: 3, shelfEnabled: false, shelfGain: 0, cancelHfKnee: false };
+  it('writes the raw design when cancel is off', () => {
+    const params = testParams({ bands, cancelRolloff: false });
     expect(writtenGain(10000, params)).toBeCloseTo(designGain(10000, params), 9);
-    expect(writtenGain(20000, params)).toBeCloseTo(designGain(20000, params), 9);
   });
 
-  it('still cancels the HF knee when cancelHfKnee is explicitly true', () => {
-    const params: CurveParams = { slope: 3, shelfEnabled: false, shelfGain: 0, cancelHfKnee: true };
-    expect(writtenGain(10000, params)).toBeCloseTo(designGain(10000, params) - hfKneeGain(10000), 9);
+  it('the listener gets the design when the rolloff is cancelled', () => {
+    const params = testParams({ bands });
+    for (const f of [100, 5000, 10000, 20000]) {
+      expect(resultGain(f, params)).toBeCloseTo(designGain(f, params), 9);
+    }
+  });
+
+  it('the listener gets design + rolloff when cancel is off', () => {
+    const params = testParams({ bands, cancelRolloff: false, rolloffType: 1 });
+    expect(resultGain(10000, params)).toBeCloseTo(designGain(10000, params) + rolloffGain(1, 10000), 9);
   });
 });
 
 describe('computeTrimShift', () => {
-  it('is the writtenGain value at 20Hz for a positive-slope, shelf-disabled curve', () => {
-    // the curve is monotonically decreasing with frequency in this case, so the
-    // max over the grid is at its lowest point, 20Hz
-    const params: CurveParams = { slope: 6, shelfEnabled: false, shelfGain: 0 };
-    const expected = writtenGain(20, params);
-    expect(computeTrimShift(params)).toBeCloseTo(expected, 6);
+  it('is the maximum of the written curve over the write grid', () => {
+    const params = testParams({ bands: tiltBands(0.7) });
+    const max = Math.max(...frequencyGrid().map((f) => writtenGain(f, params)));
+    expect(computeTrimShift(params)).toBeCloseTo(max, 9);
   });
 
-  it('is close to shelfGain for a gentle slope where the shelf plateau is the peak of the curve', () => {
-    const params: CurveParams = { slope: 0.7, shelfEnabled: true, shelfGain: 6 };
-    expect(computeTrimShift(params)).toBeCloseTo(6, 2);
-  });
-
-  it('equals the negative of the HF knee minimum when slope is 0 (flat design, pure knee cancellation)', () => {
-    const params: CurveParams = { slope: 0, shelfEnabled: false, shelfGain: 0 };
-    expect(computeTrimShift(params)).toBeCloseTo(6.1328, 3);
-  });
-
-  it('is 0 for a flat design with knee cancellation off (nothing to compensate)', () => {
-    const params: CurveParams = { slope: 0, shelfEnabled: false, shelfGain: 0, cancelHfKnee: false };
-    expect(computeTrimShift(params)).toBeCloseTo(0, 9);
+  it('follows the selected rolloff type', () => {
+    // a rising curve at 20kHz makes the rolloff type matter for the maximum
+    const high = [{ type: 'tilt' as const, enabled: true, slope: -3, pivot: 1000, fLow: 20, fHigh: 20000 }];
+    const one = computeTrimShift(testParams({ bands: high, rolloffType: 1 }));
+    const two = computeTrimShift(testParams({ bands: high, rolloffType: 2 }));
+    expect(one).not.toBeCloseTo(two, 3);
   });
 });

@@ -9,17 +9,18 @@ import {
 } from './ady';
 import { createChart, updateChart } from './chart';
 import { initCorrectionUi } from './correctionUi';
-import { buildDownloadSummary } from './downloadSummary';
+import { buildDownloadSummary, buildFilenameSuffix } from './downloadSummary';
 import { computeTrimShift, type CurveParams } from './curve';
+import { DEFAULT_PRESET_NAME, presetBands } from './presets';
 
 let currentAdy: AdyFile | null = null;
 let chart: ReturnType<typeof createChart> | null = null;
 
 const params: CurveParams = {
-  slope: 0.7,
-  shelfEnabled: true,
-  shelfGain: 4.5,
-  cancelHfKnee: true,
+  bands: presetBands(DEFAULT_PRESET_NAME),
+  rolloffType: 2,
+  cancelRolloff: true,
+  subTrim: true,
 };
 
 const dropzone = document.getElementById('dropzone') as HTMLElement;
@@ -27,12 +28,7 @@ const fileInput = document.getElementById('file-input') as HTMLInputElement;
 const errorMessage = document.getElementById('error-message') as HTMLElement;
 const editor = document.getElementById('editor') as HTMLElement;
 const chartContainer = document.getElementById('chart') as HTMLElement;
-const slopeRange = document.getElementById('slope') as HTMLInputElement;
-const slopeNumber = document.getElementById('slope-number') as HTMLInputElement;
-const shelfEnabledInput = document.getElementById('shelf-enabled') as HTMLInputElement;
 const cancelHfKneeInput = document.getElementById('cancel-hf-knee') as HTMLInputElement;
-const shelfGainRange = document.getElementById('shelf-gain') as HTMLInputElement;
-const shelfGainNumber = document.getElementById('shelf-gain-number') as HTMLInputElement;
 const channelSummaryBody = document.querySelector('#channel-summary tbody') as HTMLElement;
 const noSubwooferWarning = document.getElementById('no-subwoofer-warning') as HTMLElement;
 const downloadSection = document.getElementById('download-section') as HTMLElement;
@@ -107,7 +103,7 @@ function renderChannelSummary(): void {
     row.appendChild(roleCell);
 
     const trimCell = document.createElement('td');
-    trimCell.textContent = isSub ? trimShift.toFixed(2) : '—';
+    trimCell.textContent = isSub ? (params.subTrim ? trimShift.toFixed(2) : 'skipped') : '—';
     row.appendChild(trimCell);
 
     channelSummaryBody.appendChild(row);
@@ -148,39 +144,8 @@ dropzone.addEventListener('drop', (event) => {
   if (file) loadFile(file);
 });
 
-function syncPair(range: HTMLInputElement, number: HTMLInputElement, onChange: (value: number) => void): void {
-  range.addEventListener('input', () => {
-    number.value = range.value;
-    const value = parseFloat(range.value);
-    if (Number.isFinite(value)) onChange(value);
-  });
-  number.addEventListener('input', () => {
-    const value = parseFloat(number.value);
-    if (!Number.isFinite(value)) return; // cleared/invalid: keep the last valid value
-    range.value = number.value;
-    onChange(value);
-  });
-}
-
-syncPair(slopeRange, slopeNumber, (value) => {
-  params.slope = value;
-  onParamsChanged();
-});
-
-syncPair(shelfGainRange, shelfGainNumber, (value) => {
-  params.shelfGain = value;
-  onParamsChanged();
-});
-
-shelfEnabledInput.addEventListener('change', () => {
-  params.shelfEnabled = shelfEnabledInput.checked;
-  shelfGainRange.disabled = !params.shelfEnabled;
-  shelfGainNumber.disabled = !params.shelfEnabled;
-  onParamsChanged();
-});
-
 cancelHfKneeInput.addEventListener('change', () => {
-  params.cancelHfKnee = cancelHfKneeInput.checked;
+  params.cancelRolloff = cancelHfKneeInput.checked;
   onParamsChanged();
 });
 
@@ -193,9 +158,7 @@ downloadButton.addEventListener('click', () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   // distinct names so test variants can't be mistaken for the normal file
-  const suffix =
-    (params.cancelHfKnee === false ? '_no-knee-cancel' : '') +
-    (hasAppliedTrims(currentAdy, trims) ? '_measured-trim' : '');
+  const suffix = buildFilenameSuffix(params, hasAppliedTrims(currentAdy, trims));
   const filename =
     typeof result.title === 'string' && result.title.length > 0
       ? `${result.title}_corrected${suffix}.ady`

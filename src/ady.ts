@@ -64,17 +64,16 @@ export function isSubwooferChannel(channel: AdyChannel): boolean {
   return channel.commandId.startsWith('SW');
 }
 
-const FORCED_TARGET_CURVE_TYPE = 2;
-
 function formatPoint(freq: number, gain: number): string {
   return `{${freq.toFixed(1)}, ${gain.toFixed(3)}}`;
 }
 
 /**
- * Returns a new AdyFile with the designed curve written to every channel,
- * subwoofer trim compensated, and enTargetCurveType forced to the value
- * that matches the modeled HF knee. Non-subwoofer channels that have an entry
- * in `trims` get that per-channel trim added on top of the shared curve.
+ * Returns a new AdyFile with the designed curve written to every channel and
+ * enTargetCurveType set to the selected HF rolloff type. When params.subTrim
+ * is on, subwoofer trim is compensated; when off, the sub's trimAdjustment is
+ * left exactly as it was. Non-subwoofer channels that have an entry in
+ * `trims` get that per-channel trim added on top of the shared curve.
  * Does not mutate the input.
  */
 export function applyCurveToAdy(
@@ -92,13 +91,13 @@ export function applyCurveToAdy(
     channel.customTargetCurvePoints = trim
       ? grid.map((f) => formatPoint(f, writtenGain(f, params) + trim(f)))
       : sharedPoints;
-    if (isSubwooferChannel(channel)) {
+    if (isSubwooferChannel(channel) && params.subTrim) {
       const originalTrim = parseFloat(channel.trimAdjustment);
       channel.trimAdjustment = (originalTrim + trimShift).toFixed(6);
     }
   }
 
-  clone.enTargetCurveType = FORCED_TARGET_CURVE_TYPE;
+  clone.enTargetCurveType = params.rolloffType;
   return clone;
 }
 
@@ -106,6 +105,27 @@ export function applyCurveToAdy(
 export function hasAppliedTrims(ady: AdyFile, trims: ReadonlyMap<string, TrimFn> | undefined): boolean {
   if (!trims) return false;
   return ady.detectedChannels.some((c) => !isSubwooferChannel(c) && trims.has(c.commandId));
+}
+
+const POINT_FREQUENCY = /^\{\s*([0-9.]+)\s*,/;
+
+/**
+ * True when some channel's customTargetCurvePoints sit exactly on this tool's
+ * write grid (2161 points, 1 Hz then 10 Hz steps). Such a file was very likely
+ * written by this tool (or the script it replaced), so the sub trim was
+ * probably already applied to it. A heuristic: files from other sources may
+ * not match.
+ */
+export function looksAlreadyProcessed(ady: AdyFile): boolean {
+  const grid = frequencyGrid();
+  return ady.detectedChannels.some((channel) => {
+    const points = channel.customTargetCurvePoints;
+    if (points.length !== grid.length) return false;
+    return points.every((point, i) => {
+      const match = POINT_FREQUENCY.exec(point);
+      return match !== null && Math.abs(parseFloat(match[1]) - grid[i]) < 0.06;
+    });
+  });
 }
 
 export function serializeAdy(ady: AdyFile): string {

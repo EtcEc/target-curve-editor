@@ -1,6 +1,6 @@
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
-import { designGain, type CurveParams } from './curve';
+import { resultGain, type CurveParams } from './curve';
 
 /** Log-spaced sample points for a smooth chart line, independent of the .ady write grid. */
 export function chartFrequencies(): number[] {
@@ -15,10 +15,10 @@ export function chartFrequencies(): number[] {
   return freqs;
 }
 
-/** Transforms curve params into [frequencies, gains] for the live preview chart. */
-export function designCurveData(params: CurveParams): [number[], number[]] {
+/** [frequencies, gains] for the live preview chart: what the listener gets (design + any rolloff left on). */
+export function resultCurveData(params: CurveParams): [number[], number[]] {
   const freqs = chartFrequencies();
-  const gains = freqs.map((f) => designGain(f, params));
+  const gains = freqs.map((f) => resultGain(f, params));
   return [freqs, gains];
 }
 
@@ -37,9 +37,9 @@ export function createChart(container: HTMLElement, params: CurveParams): uPlot 
     ],
     series: [{}, { label: 'Target Curve', stroke: '#e33', width: 2 }],
   };
-  return new uPlot(opts, designCurveData(params) as uPlot.AlignedData, container);
+  return new uPlot(opts, resultCurveData(params) as uPlot.AlignedData, container);
 }
 
 export function updateChart(chart: uPlot, params: CurveParams): void {
-  chart.setData(designCurveData(params) as uPlot.AlignedData);
+  chart.setData(resultCurveData(params) as uPlot.AlignedData);
 }

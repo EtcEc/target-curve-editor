@@ -1,4 +1,5 @@
-import { hfKneeGain } from './hfKnee';
+import { sumBands, type Band } from './bands';
+import { rolloffGain, type RolloffType } from './rolloff';
 
 const PIVOT_FREQ = 1000;
 
@@ -19,30 +20,22 @@ export function frequencyGrid(): number[] {
   return grid;
 }
 
-/**
- * Fixed breakpoints (Hz) for the shelf<->tilt crossfade. Not user-exposed:
- * below SHELF_LOW_FREQ the curve sits flat at shelfGain; at/above
- * SHELF_HIGH_FREQ it's pure tilt, unaffected by the shelf.
- */
-const SHELF_LOW_FREQ = 40;
-const SHELF_HIGH_FREQ = 100;
-
 /** Extra gain (dB) added on top of a channel's written curve, as a function of frequency. */
 export type TrimFn = (freq: number) => number;
 
 export interface CurveParams {
-  /** dB/octave. Positive tilts down toward treble, up toward bass. */
-  slope: number;
-  shelfEnabled: boolean;
-  /** Flat plateau gain (dB) the curve sits at below ~40Hz. Only used when shelfEnabled. */
-  shelfGain: number;
+  /** The design curve is the plain sum of these bands. */
+  bands: Band[];
+  /** Which of Audyssey's two fixed HF rolloff shapes the AVR applies (enTargetCurveType). */
+  rolloffType: RolloffType;
   /**
-   * Pre-cancel Audyssey's fixed HF rolloff in the written curve. Defaults to
-   * true. Turn off to write the raw designed curve instead -- a diagnostic for
-   * checking whether the AVR actually applies that rolloff on top of custom
-   * points, or whether it's only drawn in the MultEQ app's Curve Editor.
+   * Pre-cancel that rolloff in the written curve so the design is what you
+   * actually get. Untick to write the design as is; the listener then also
+   * gets the rolloff on top.
    */
-  cancelHfKnee?: boolean;
+  cancelRolloff: boolean;
+  /** Shift the subwoofer's trimAdjustment to compensate Audyssey's 0dB-max renormalisation. */
+  subTrim: boolean;
 }
 
 /** Smooth 0->1 ease with zero slope at both ends. */
@@ -51,32 +44,24 @@ export function smoothstep(t: number): number {
   return clamped * clamped * (3 - 2 * clamped);
 }
 
-/**
- * The curve you're designing: down-tilt, optionally crossfading into a flat
- * bass shelf below ~40Hz. This is what the live preview chart plots. Below
- * SHELF_LOW_FREQ the result is exactly shelfGain; at/above SHELF_HIGH_FREQ
- * it's exactly tilt(freq, slope) -- the shelf has no influence on the rest
- * of the curve, including the HF-knee cancellation region.
- */
+/** The curve you are designing: the sum of the enabled bands. */
 export function designGain(freq: number, params: CurveParams): number {
-  const t = tilt(freq, params.slope);
-  if (!params.shelfEnabled) return t;
-  const x =
-    (Math.log2(freq) - Math.log2(SHELF_LOW_FREQ)) /
-    (Math.log2(SHELF_HIGH_FREQ) - Math.log2(SHELF_LOW_FREQ));
-  const weight = smoothstep(x);
-  return params.shelfGain * (1 - weight) + t * weight;
+  return sumBands(freq, params.bands);
 }
 
 /**
- * The curve actually written to the .ady file: the designed curve with
- * Audyssey's fixed HF-knee rolloff pre-cancelled (unless cancelHfKnee is
- * false), so what you designed is what you actually get after Audyssey
- * applies its own knee on top.
+ * The curve actually written to the .ady file: the design with the selected
+ * HF rolloff pre-cancelled (unless cancelRolloff is false), so the design is
+ * what you get after Audyssey applies its own rolloff on top.
  */
 export function writtenGain(freq: number, params: CurveParams): number {
   const design = designGain(freq, params);
-  return params.cancelHfKnee === false ? design : design - hfKneeGain(freq);
+  return params.cancelRolloff ? design - rolloffGain(params.rolloffType, freq) : design;
+}
+
+/** What the listener gets: the written curve plus the rolloff Audyssey always applies. This is what the chart shows. */
+export function resultGain(freq: number, params: CurveParams): number {
+  return writtenGain(freq, params) + rolloffGain(params.rolloffType, freq);
 }
 
 /**
