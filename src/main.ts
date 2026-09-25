@@ -3,6 +3,7 @@ import {
   isSubwooferChannel,
   applyCurveToAdy,
   hasAppliedTrims,
+  looksAlreadyProcessed,
   serializeAdy,
   AdyValidationError,
   type AdyFile,
@@ -12,6 +13,7 @@ import { initCorrectionUi } from './correctionUi';
 import { buildDownloadSummary, buildFilenameSuffix } from './downloadSummary';
 import { computeTrimShift, type CurveParams } from './curve';
 import { DEFAULT_PRESET_NAME, presetBands } from './presets';
+import { isRolloffType } from './rolloff';
 
 let currentAdy: AdyFile | null = null;
 let chart: ReturnType<typeof createChart> | null = null;
@@ -29,6 +31,10 @@ const errorMessage = document.getElementById('error-message') as HTMLElement;
 const editor = document.getElementById('editor') as HTMLElement;
 const chartContainer = document.getElementById('chart') as HTMLElement;
 const cancelHfKneeInput = document.getElementById('cancel-hf-knee') as HTMLInputElement;
+const rolloffTypeSelect = document.getElementById('rolloff-type') as HTMLSelectElement;
+const rolloffNotice = document.getElementById('rolloff-notice') as HTMLElement;
+const subTrimInput = document.getElementById('sub-trim') as HTMLInputElement;
+const subTrimNotice = document.getElementById('sub-trim-notice') as HTMLElement;
 const channelSummaryBody = document.querySelector('#channel-summary tbody') as HTMLElement;
 const noSubwooferWarning = document.getElementById('no-subwoofer-warning') as HTMLElement;
 const downloadSection = document.getElementById('download-section') as HTMLElement;
@@ -51,12 +57,36 @@ function clearError(): void {
   errorMessage.hidden = true;
 }
 
+/** Sets the rolloff type and the sub-trim default from the freshly loaded file. */
+function applyFileDefaults(ady: AdyFile): void {
+  const type = ady.enTargetCurveType;
+  if (isRolloffType(type)) {
+    params.rolloffType = type;
+    rolloffNotice.hidden = true;
+  } else {
+    params.rolloffType = 2;
+    rolloffNotice.textContent = `This file's enTargetCurveType is ${type}, which is not a known HF rolloff. Using Roll Off 2; change it above if needed.`;
+    rolloffNotice.hidden = false;
+  }
+  rolloffTypeSelect.value = String(params.rolloffType);
+
+  const processed = looksAlreadyProcessed(ady);
+  params.subTrim = !processed;
+  subTrimInput.checked = params.subTrim;
+  if (processed) {
+    subTrimNotice.textContent =
+      'This file already has a target curve written by this tool, so its sub trim was probably already compensated. Sub trim compensation is off; tick it if you know it is not.';
+  }
+  subTrimNotice.hidden = !processed;
+}
+
 function loadFile(file: File): void {
   const reader = new FileReader();
   reader.onload = () => {
     const text = reader.result as string;
     try {
       currentAdy = parseAdy(text);
+      applyFileDefaults(currentAdy);
       correctionUi.setBaseChannels(currentAdy.detectedChannels.map((c) => c.commandId));
       clearError();
       editor.hidden = false;
@@ -146,6 +176,19 @@ dropzone.addEventListener('drop', (event) => {
 
 cancelHfKneeInput.addEventListener('change', () => {
   params.cancelRolloff = cancelHfKneeInput.checked;
+  onParamsChanged();
+});
+
+rolloffTypeSelect.addEventListener('change', () => {
+  const value = Number(rolloffTypeSelect.value);
+  if (isRolloffType(value)) params.rolloffType = value;
+  rolloffNotice.hidden = true;
+  onParamsChanged();
+});
+
+subTrimInput.addEventListener('change', () => {
+  params.subTrim = subTrimInput.checked;
+  subTrimNotice.hidden = true;
   onParamsChanged();
 });
 

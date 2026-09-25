@@ -170,3 +170,20 @@ button {
 #generate-dialog input[type='file'] {
   max-width: 100%;
 }
+
+#audyssey-behaviour {
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin: 0 0 1rem;
+}
+
+#audyssey-behaviour legend {
+  padding: 0 0.4rem;
+  color: #ccc;
+}
+
+#audyssey-behaviour label {
+  display: block;
+  margin-bottom: 0.6rem;
+}
