@@ -62,17 +62,21 @@ export function chartOffset(freq: number, params: CurveParams): number {
   return params.cancelRolloff ? 0 : rolloffGain(params.rolloffType, freq);
 }
 
+/** The highest point of the written curve on the write grid, and where it is. */
+export function writtenPeak(params: CurveParams): { freq: number; gain: number } {
+  let peak = { freq: 20, gain: -Infinity };
+  for (const f of frequencyGrid()) {
+    const gain = writtenGain(f, params);
+    if (gain > peak.gain) peak = { freq: f, gain };
+  }
+  return peak;
+}
+
 /**
  * The amount Audyssey will shift a subwoofer's curve down to normalize its
  * max to 0dB -- and therefore the trim boost needed to restore the
  * absolute level you designed.
  */
 export function computeTrimShift(params: CurveParams): number {
-  const grid = frequencyGrid();
-  let max = -Infinity;
-  for (const f of grid) {
-    const g = writtenGain(f, params);
-    if (g > max) max = g;
-  }
-  return max;
+  return writtenPeak(params).gain;
 }

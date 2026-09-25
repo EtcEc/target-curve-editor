@@ -14,10 +14,13 @@ import { createChart, slotCurveData, updateChart } from './chart';
 import { initCorrectionUi } from './correctionUi';
 import { initDesignUi } from './designUi';
 import { buildDownloadSummary, buildFilenameSuffix } from './downloadSummary';
-import { computeTrimShift, type CurveParams } from './curve';
+import { computeTrimShift, writtenPeak, type CurveParams } from './curve';
 import { DEFAULT_PRESET_NAME, presetBands } from './presets';
 import { isRolloffType } from './rolloff';
 import { SLOT_IDS, createSlots } from './slots';
+
+/** A subwoofer never plays above this; a curve peak higher up is worth a heads-up next to the sub trim. */
+const SUB_RANGE_HZ = 200;
 
 let currentAdy: AdyFile | null = null;
 let chart: ReturnType<typeof createChart> | null = null;
@@ -39,6 +42,7 @@ const rolloffTypeSelect = document.getElementById('rolloff-type') as HTMLSelectE
 const rolloffNotice = document.getElementById('rolloff-notice') as HTMLElement;
 const subTrimInput = document.getElementById('sub-trim') as HTMLInputElement;
 const subTrimNotice = document.getElementById('sub-trim-notice') as HTMLElement;
+const subTrimPeak = document.getElementById('sub-trim-peak') as HTMLElement;
 const channelSummaryBody = document.querySelector('#channel-summary tbody') as HTMLElement;
 const noSubwooferWarning = document.getElementById('no-subwoofer-warning') as HTMLElement;
 const downloadSection = document.getElementById('download-section') as HTMLElement;
@@ -179,6 +183,16 @@ function renderDownloadSummary(): void {
   downloadSummary.textContent = buildDownloadSummary(params, trimmed, correctionUi.getCutoffHz());
 }
 
+/** Explains a sub trim that comes from a peak above the sub's range (e.g. the boost that cancels the HF rolloff). */
+function renderSubTrimPeak(): void {
+  const peak = writtenPeak(params);
+  const explain = params.subTrim && peak.freq > SUB_RANGE_HZ;
+  subTrimPeak.hidden = !explain;
+  if (explain) {
+    subTrimPeak.textContent = `The sub trim is +${peak.gain.toFixed(2)} dB, set by the highest point of the written curve, at ${peak.freq} Hz, well above the sub's range. If the sub ends up too loud, untick "Compensate sub trim".`;
+  }
+}
+
 function onParamsChanged(): void {
   const problem = validateBands(params.bands);
   bandError.textContent = problem ?? '';
@@ -187,10 +201,12 @@ function onParamsChanged(): void {
   if (problem !== null) {
     // keep the last good chart; nothing is exported meanwhile
     bandLevel.textContent = '';
+    subTrimPeak.hidden = true;
     downloadSummary.textContent = 'Fix the band values above to see what the download will contain.';
     renderChannelSummary();
     return;
   }
+  renderSubTrimPeak();
   bandLevel.textContent = `Level at 20 Hz: ${sumBands(20, params.bands).toFixed(2)} dB`;
   if (chart) updateChart(chart, params, SLOT_IDS.map((id) => slotCurveData(slots.get(id), params)));
   if (currentAdy) {

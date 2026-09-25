@@ -66,3 +66,9 @@ itself; errors stay inside the dialog, which stays open. The per-row report
 (`#generate-report`) and the RMS warnings (`#generate-warnings`) moved into step
 3, beneath the loaded-correction info, so they remain visible after the dialog
 closes. Still works with no base `.ady` loaded.
+
+Later wording change: the dialog's intro no longer says "Load the base .ady in step
+1" (the generator does not need it) and the field reads "The .ady loaded on the
+AVR for these sweeps". After a file is picked, a note names the HF rolloff type
+read from it. The Close button sticks to the top of a scrolling dialog, and the
+two tables in step 3 have headings.

@@ -178,3 +178,28 @@ Test-first, synthetic data only (repo is public).
   curves; the ~2 kHz
   midrange compensation flag; anything on the measured-correction side beyond
   accepting both rolloff types.
+
+## Phase 2 as built
+
+Built on 2026-09-26 (plan: `docs/superpowers/plans/2026-09-26-phase-2.md`).
+
+- **Handles:** one per enabled shelf or bell band, laid over the chart (a tilt
+  has no single point to drag, so it has none). Dragging sets the band's
+  frequency and gain so the handle lands under the pointer (exact, not
+  incremental: a bell contributes its full gain at its own frequency and a
+  shelf half of it, so the gain follows from what the other bands contribute
+  there). With the HF rolloff left on, the handle sits on the plotted curve
+  (design + rolloff). The mouse wheel over a handle changes Q by about 10% a
+  notch. Drag-to-zoom on the chart is switched off.
+- **Compare slots:** A, B, C hold a copy of the bands in memory (they do not
+  survive a reload; use Save design for that). They are drawn faintly with the
+  current rolloff settings; Load makes a slot the design being edited. The
+  download always uses the edited design.
+- **Design file:** `{ version: 1, name, bands, cancelRolloff }`, validated like
+  the editor (a bad file changes nothing). The rolloff type is not stored.
+- **Sub trim note:** when the written curve peaks above 200 Hz (for example a
+  flat design with the rolloff cancelled peaks at 20 kHz), the page says what
+  set the sub trim and suggests unticking it if the sub sounds too loud. Whether
+  Audyssey normalises a sub's curve over the full band is still unverified.
+- **Not shipped:** the literature presets (Harman-style, B&K-style). The rule
+  above stands: they need a cited table reproduced within 0.5 dB.

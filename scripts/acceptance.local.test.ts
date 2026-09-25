@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { parseAdy } from '../src/ady';
@@ -7,67 +7,62 @@ import { generateCorrection } from '../src/generate';
 import { logGrid } from '../src/measuredError';
 
 /**
- * Opt-in check against a real measurement session. Skipped unless REAL_DATA_DIR
- * points at a folder with Default.ady (stock calibration) and L.txt, R.txt, C.txt
- * (REW exports, one per speaker, measured on that stock calibration).
+ * Opt-in check against a real measurement session (never committed; needs your own files).
+ * Skipped unless both variables are set:
  *
- *   REAL_DATA_DIR=/path/to/folder npx vitest run scripts/acceptance.local.test.ts
+ *   REAL_ADY       the .ady whose filters were loaded on the AVR for the REW sweeps
+ *   REAL_DATA_DIR  a folder of REW text exports named "<speaker> Pos<N>.txt"
+ *                  (speaker: L, R, C, BL, BR)
  *
- * The bounds are loose on purpose: they encode the shape found in the design
- * spec (a dip near 4 kHz, a lift of ~1-2 dB from 6-10 kHz), not exact numbers.
+ *   REAL_ADY=/path/Tilted.ady REAL_DATA_DIR=/path/folder npx vitest run scripts/acceptance.local.test.ts
+ *
+ * The checks are deliberately shape-agnostic: they hold for any target curve and
+ * either HF rolloff type, and only look for a correction that is sane.
  */
+const adyPath = process.env.REAL_ADY;
 const dir = process.env.REAL_DATA_DIR;
-const SPEAKERS: Record<string, string> = { L: 'FL', R: 'FR', C: 'C' };
+// BL/BR are assumed to be the surround-back speakers' SLA/SRA channels
+const SPEAKERS: Record<string, string> = { L: 'FL', R: 'FR', C: 'C', BL: 'SLA', BR: 'SRA' };
 
 function load() {
-  const read = (name: string) => readFileSync(join(dir as string, name), 'utf8');
-  const ady = parseAdy(read('Default.ady'));
-  const speakers = Object.entries(SPEAKERS).map(([file, commandId]) => ({
-    commandId,
-    files: [{ name: `${file}.txt`, text: read(`${file}.txt`) }],
-  }));
-  return generateCorrection(ady, speakers, 'acceptance');
+  const ady = parseAdy(readFileSync(adyPath as string, 'utf8'));
+  const present = readdirSync(dir as string);
+  const speakers = Object.entries(SPEAKERS)
+    .map(([prefix, commandId]) => ({
+      commandId,
+      files: present
+        .filter((name) => new RegExp(`^${prefix} Pos\\d+\\.txt$`).test(name))
+        .map((name) => ({ name, text: readFileSync(join(dir as string, name), 'utf8') })),
+    }))
+    .filter((s) => s.files.length > 0 && ady.detectedChannels.some((c) => c.commandId === s.commandId));
+  return { speakers, result: generateCorrection(ady, speakers, 'acceptance') };
 }
 
-describe.skipIf(!dir)('local acceptance: real measurement session', () => {
-  const grid = logGrid();
-  const at = (values: number[], hz: number) => values[grid.findIndex((f) => f >= hz)];
-  const meanBetween = (values: number[], lo: number, hi: number) => {
-    const picked = values.filter((_, i) => grid[i] >= lo && grid[i] <= hi);
-    return picked.reduce((a, b) => a + b, 0) / picked.length;
-  };
-
-  it('generates without warnings and with one position per speaker', () => {
-    const { correction, warnings } = load();
-    expect(warnings).toEqual([]);
-    for (const id of Object.values(SPEAKERS)) expect(correction.channels[id].positions).toBe(1);
+describe.skipIf(!adyPath || !dir)('local acceptance: real measurement session', () => {
+  it('finds speakers and averages every position file it was given', () => {
+    const { speakers, result } = load();
+    expect(speakers.length).toBeGreaterThan(0);
+    for (const s of speakers) expect(result.correction.channels[s.commandId].positions).toBe(s.files.length);
   });
 
-  it('finds a dip near 4 kHz on every speaker', () => {
-    const { correction } = load();
-    for (const id of Object.values(SPEAKERS)) {
-      const e = at(correction.channels[id].error, 4000);
-      expect(e).toBeGreaterThan(-2.2);
-      expect(e).toBeLessThan(-0.3);
+  it('gives no far-off warnings: the target the tool reads back matches what was measured', () => {
+    expect(load().result.warnings).toEqual([]);
+  });
+
+  it('has a finite error curve on the shared grid for every speaker', () => {
+    const { result } = load();
+    for (const channel of Object.values(result.correction.channels)) {
+      expect(channel.error).toHaveLength(logGrid().length);
+      expect(channel.error.every(Number.isFinite)).toBe(true);
     }
   });
 
-  it('finds a lift between 6.3 and 10 kHz on every speaker', () => {
-    const { correction } = load();
-    for (const id of Object.values(SPEAKERS)) {
-      const e = meanBetween(correction.channels[id].error, 6300, 10000);
-      expect(e).toBeGreaterThan(0.5);
-      expect(e).toBeLessThan(2.5);
-    }
-  });
-
-  it('derives a cut of roughly 0.5-2.5 dB at 10 kHz with the default cutoff', () => {
-    const { correction } = load();
-    const trims = buildChannelTrims(correction, 2000);
-    for (const id of Object.values(SPEAKERS)) {
-      const t = trims.get(id)!(10000);
-      expect(t).toBeLessThan(-0.5);
-      expect(t).toBeGreaterThan(-2.5);
+  it('keeps every derived trim within the +-3 dB clamp and zero well below the cutoff', () => {
+    const { result } = load();
+    const trims = buildChannelTrims(result.correction, 2000);
+    for (const trim of trims.values()) {
+      for (const f of logGrid()) expect(Math.abs(trim(f))).toBeLessThanOrEqual(3 + 1e-9);
+      expect(trim(200)).toBeCloseTo(0, 6);
     }
   });
 });

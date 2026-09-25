@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chartOffset, computeTrimShift, designGain, frequencyGrid, resultGain, writtenGain } from './curve';
+import { chartOffset, computeTrimShift, writtenPeak, designGain, frequencyGrid, resultGain, writtenGain } from './curve';
 import { rolloffGain } from './rolloff';
 import { testParams, tiltBands } from './fixtures/testParams';
 
@@ -93,5 +93,21 @@ describe('chartOffset', () => {
         expect(resultGain(f, params)).toBeCloseTo(designGain(f, params) + chartOffset(f, params), 9);
       }
     }
+  });
+});
+
+describe('writtenPeak', () => {
+  it('finds the highest point of the written curve, and computeTrimShift is its gain', () => {
+    const params = testParams();
+    const peak = writtenPeak(params);
+    expect(peak.gain).toBe(computeTrimShift(params));
+    // the default design is highest in the bass
+    expect(peak.freq).toBeLessThan(100);
+  });
+
+  it('lands at 20 kHz for a flat design with the rolloff cancelled (the cancel boost is the highest point)', () => {
+    const peak = writtenPeak(testParams({ bands: [], rolloffType: 1 }));
+    expect(peak.freq).toBe(20000);
+    expect(peak.gain).toBeCloseTo(-rolloffGain(1, 20000), 9);
   });
 });
