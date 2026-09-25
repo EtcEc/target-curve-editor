@@ -80,3 +80,23 @@ export function writtenPeak(params: CurveParams): { freq: number; gain: number }
 export function computeTrimShift(params: CurveParams): number {
   return writtenPeak(params).gain;
 }
+
+/** The highest point at or below this frequency is what a subwoofer's own range can reach. */
+const SUB_RANGE_HZ = 200;
+
+/**
+ * The written curve's peak when it sits well above the sub's range (more than
+ * 0.5 dB over the highest point at or below 200 Hz), otherwise null. That is the
+ * case worth telling the user about, because the sub trim then follows a point
+ * the sub never plays.
+ */
+export function subTrimPeakAboveSub(params: CurveParams): { freq: number; gain: number } | null {
+  const peak = writtenPeak(params);
+  if (peak.freq <= SUB_RANGE_HZ) return null;
+  let subMax = -Infinity;
+  for (const f of frequencyGrid()) {
+    if (f > SUB_RANGE_HZ) break;
+    subMax = Math.max(subMax, writtenGain(f, params));
+  }
+  return peak.gain - subMax > 0.5 ? peak : null;
+}

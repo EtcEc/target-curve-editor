@@ -1,5 +1,5 @@
 import type uPlot from 'uplot';
-import { BAND_LABELS } from './bands';
+import { BAND_LABELS, validateBands } from './bands';
 import { chartOffset, type CurveParams } from './curve';
 import { dragBand, handleFor, scaleQ } from './handles';
 
@@ -28,13 +28,14 @@ export function attachHandles(
     // uPlot listens for mouse events on the overlay; the handle owns its own pointer
     node.addEventListener('mousedown', (e) => e.stopPropagation());
     node.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || validateBands(params.bands) !== null) return;
       e.preventDefault();
       e.stopPropagation();
       node.setPointerCapture(e.pointerId);
       node.classList.add('dragging');
     });
     node.addEventListener('pointermove', (e) => {
-      if (!node.hasPointerCapture(e.pointerId)) return;
+      if (!node.hasPointerCapture(e.pointerId) || validateBands(params.bands) !== null) return;
       const band = params.bands[index];
       if (!band || band.type === 'tilt') return;
       const rect = chart.over.getBoundingClientRect();
@@ -46,17 +47,13 @@ export function attachHandles(
       band.gain = next.gain;
       onChange();
     });
-    const release = (e: PointerEvent) => {
-      if (node.hasPointerCapture(e.pointerId)) node.releasePointerCapture(e.pointerId);
-      node.classList.remove('dragging');
-    };
-    node.addEventListener('pointerup', release);
-    node.addEventListener('pointercancel', release);
+    // fires after pointerup, pointercancel and any other way the capture ends
+    node.addEventListener('lostpointercapture', () => node.classList.remove('dragging'));
     node.addEventListener(
       'wheel',
       (e) => {
         const band = params.bands[index];
-        if (!band || band.type === 'tilt') return;
+        if (!band || band.type === 'tilt' || validateBands(params.bands) !== null) return;
         e.preventDefault();
         band.q = Math.round(scaleQ(band.q, e.deltaY) * 100) / 100;
         onChange();
@@ -69,6 +66,9 @@ export function attachHandles(
 
   function update(): void {
     const bands = params.bands;
+    // while any band has unusable values the handles would edit garbage: hide them until it is fixed
+    layer.hidden = validateBands(bands) !== null;
+    if (layer.hidden) return;
     while (nodes.length > bands.length) nodes.pop()?.remove();
     while (nodes.length < bands.length) nodes.push(makeNode(nodes.length));
     bands.forEach((band, i) => {

@@ -46,13 +46,19 @@ export function dragBand(
   const others = sumBands(f, bands) - bandGain(f, band);
   const ownDb = chartDb - offset(f) - others;
   const gain = band.type === 'bell' ? ownDb : 2 * ownDb;
+  // another band with unusable values makes the sum non-finite: leave this band alone
+  if (!Number.isFinite(gain)) return { freq: band.freq, gain: band.gain };
   const bounded = Math.min(MAX_GAIN, Math.max(-MAX_GAIN, gain));
   return { freq: f, gain: Math.round(bounded * 10) / 10 };
 }
 
-/** New Q after a mouse-wheel step: about 10% per notch, scrolling up = sharper. */
+/**
+ * New Q after a wheel event: 10% per 100 units of scroll (one notch of a mouse
+ * wheel), scrolling up = sharper. Proportional, so a trackpad's many small events
+ * add up to a gentle change; one event counts for at most three notches.
+ */
 export function scaleQ(q: number, wheelDeltaY: number): number {
-  if (wheelDeltaY === 0) return q;
-  const next = wheelDeltaY < 0 ? q * 1.1 : q / 1.1;
-  return Math.min(MAX_Q, Math.max(MIN_Q, next));
+  if (!Number.isFinite(wheelDeltaY) || wheelDeltaY === 0) return q;
+  const notches = Math.min(3, Math.max(-3, wheelDeltaY / 100));
+  return Math.min(MAX_Q, Math.max(MIN_Q, q * 1.1 ** -notches));
 }

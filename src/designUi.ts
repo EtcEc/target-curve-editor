@@ -101,7 +101,12 @@ export function initDesignUi(host: DesignUiHost): { refreshSlots(): void } {
 
     row.appendChild(
       button('Save here', `Store the current design in slot ${id} and draw it faintly on the chart`, () => {
-        if (validateBands(host.params.bands) !== null) return;
+        const problem = validateBands(host.params.bands);
+        if (problem !== null) {
+          showError(`Fix the band values before saving to a slot. ${problem}`);
+          return;
+        }
+        showError(null);
         host.slots.save(id, host.params.bands);
         refreshSlots();
         host.onSlotsChanged();

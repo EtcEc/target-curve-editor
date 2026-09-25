@@ -90,6 +90,12 @@ describe('dragBand', () => {
     expect(next.gain).toBe(Math.round(next.gain * 10) / 10);
   });
 
+  it('leaves the band as it is when another band makes the sum unusable (no NaN written)', () => {
+    const bands = [bell(), bell({ q: 0, freq: 500 })];
+    const next = dragBand(bands, 0, 1000, 2, none);
+    expect(next).toEqual({ freq: 3000, gain: -3 });
+  });
+
   it('does not touch the band list', () => {
     const bands = [bell()];
     const snapshot = JSON.stringify(bands);
@@ -102,6 +108,15 @@ describe('scaleQ', () => {
   it('raises Q when scrolling up and lowers it when scrolling down, by about 10% a step', () => {
     expect(scaleQ(1, -100)).toBeCloseTo(1.1, 6);
     expect(scaleQ(1, 100)).toBeCloseTo(1 / 1.1, 6);
+  });
+
+  it('scales with how far the wheel moved, so a small trackpad scroll is a small change', () => {
+    expect(scaleQ(1, -50)).toBeCloseTo(1.1 ** 0.5, 6);
+    expect(scaleQ(1, 10)).toBeCloseTo(1.1 ** -0.1, 6);
+  });
+
+  it('caps one event at three notches', () => {
+    expect(scaleQ(1, -100000)).toBeCloseTo(1.1 ** 3, 6);
   });
 
   it('is clamped to a usable range', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chartOffset, computeTrimShift, writtenPeak, designGain, frequencyGrid, resultGain, writtenGain } from './curve';
+import { chartOffset, computeTrimShift, subTrimPeakAboveSub, writtenPeak, designGain, frequencyGrid, resultGain, writtenGain } from './curve';
 import { rolloffGain } from './rolloff';
 import { testParams, tiltBands } from './fixtures/testParams';
 
@@ -109,5 +109,31 @@ describe('writtenPeak', () => {
     const peak = writtenPeak(testParams({ bands: [], rolloffType: 1 }));
     expect(peak.freq).toBe(20000);
     expect(peak.gain).toBeCloseTo(-rolloffGain(1, 20000), 9);
+  });
+});
+
+describe('subTrimPeakAboveSub', () => {
+  it('is null for a design whose highest point is in the bass', () => {
+    expect(subTrimPeakAboveSub(testParams())).toBeNull();
+  });
+
+  it('reports the peak for a flat design with the rolloff cancelled (the cancel boost is highest)', () => {
+    const found = subTrimPeakAboveSub(testParams({ bands: [], rolloffType: 1 }));
+    expect(found?.freq).toBe(20000);
+    expect(found?.gain).toBeCloseTo(-rolloffGain(1, 20000), 9);
+  });
+
+  it('ignores a peak that is only marginally above the bass (under 0.5 dB)', () => {
+    // flat design: 0 dB in the bass, and a treble that rises to 0.3 dB
+    const bands = [{ type: 'tilt' as const, enabled: true, slope: -0.05, pivot: 1000, fLow: 20, fHigh: 20000 }];
+    const params = testParams({ bands, cancelRolloff: false });
+    const peak = writtenPeak(params);
+    expect(peak.freq).toBeGreaterThan(200);
+    expect(subTrimPeakAboveSub(params)).toBeNull();
+  });
+
+  it('is null when the whole curve sits below 0 dB', () => {
+    const bands = [{ type: 'lowShelf' as const, enabled: true, gain: -6, freq: 100, q: 0.707 }];
+    expect(subTrimPeakAboveSub(testParams({ bands, cancelRolloff: false }))).toBeNull();
   });
 });

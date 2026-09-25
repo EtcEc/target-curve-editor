@@ -14,13 +14,10 @@ import { createChart, slotCurveData, updateChart } from './chart';
 import { initCorrectionUi } from './correctionUi';
 import { initDesignUi } from './designUi';
 import { buildDownloadSummary, buildFilenameSuffix } from './downloadSummary';
-import { computeTrimShift, writtenPeak, type CurveParams } from './curve';
+import { computeTrimShift, subTrimPeakAboveSub, type CurveParams } from './curve';
 import { DEFAULT_PRESET_NAME, presetBands } from './presets';
 import { isRolloffType } from './rolloff';
 import { SLOT_IDS, createSlots } from './slots';
-
-/** A subwoofer never plays above this; a curve peak higher up is worth a heads-up next to the sub trim. */
-const SUB_RANGE_HZ = 200;
 
 let currentAdy: AdyFile | null = null;
 let chart: ReturnType<typeof createChart> | null = null;
@@ -185,11 +182,10 @@ function renderDownloadSummary(): void {
 
 /** Explains a sub trim that comes from a peak above the sub's range (e.g. the boost that cancels the HF rolloff). */
 function renderSubTrimPeak(): void {
-  const peak = writtenPeak(params);
-  const explain = params.subTrim && peak.freq > SUB_RANGE_HZ;
-  subTrimPeak.hidden = !explain;
-  if (explain) {
-    subTrimPeak.textContent = `The sub trim is +${peak.gain.toFixed(2)} dB, set by the highest point of the written curve, at ${peak.freq} Hz, well above the sub's range. If the sub ends up too loud, untick "Compensate sub trim".`;
+  const peak = params.subTrim ? subTrimPeakAboveSub(params) : null;
+  subTrimPeak.hidden = peak === null;
+  if (peak !== null) {
+    subTrimPeak.textContent = `The sub trim is ${peak.gain > 0 ? '+' : ''}${peak.gain.toFixed(2)} dB, set by the highest point of the written curve, at ${peak.freq} Hz, well above the sub's range. If the sub ends up too loud, untick "Compensate sub trim".`;
   }
 }
 
@@ -199,7 +195,8 @@ function onParamsChanged(): void {
   bandError.hidden = problem === null;
   downloadButton.disabled = problem !== null;
   if (problem !== null) {
-    // keep the last good chart; nothing is exported meanwhile
+    // keep the last good chart; nothing is exported meanwhile (a redraw hides the chart handles)
+    chart?.redraw(false, false);
     bandLevel.textContent = '';
     subTrimPeak.hidden = true;
     downloadSummary.textContent = 'Fix the band values above to see what the download will contain.';
