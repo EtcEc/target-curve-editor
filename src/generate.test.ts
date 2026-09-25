@@ -2,21 +2,21 @@ import { describe, it, expect } from 'vitest';
 import type { AdyFile } from './ady';
 import { createSampleAdy } from './fixtures/sampleAdy';
 import { synthRewText } from './fixtures/synthMeasurement';
-import { GenerateError, REQUIRED_TARGET_CURVE_TYPE, generateCorrection } from './generate';
-import { hfKneeGain } from './hfKnee';
+import { GenerateError, checkMeasuredType, generateCorrection } from './generate';
+import { rolloffGain } from './rolloff';
 import { logGrid } from './measuredError';
 import { RewParseError } from './rewParse';
 
 function measuredAdy(): AdyFile {
   const ady = createSampleAdy(); // FL and SW1
-  ady.enTargetCurveType = REQUIRED_TARGET_CURVE_TYPE;
+  ady.enTargetCurveType = 2;
   ady.detectedChannels.push({ commandId: 'FR', customTargetCurvePoints: [], trimAdjustment: '0.000000' });
   return ady;
 }
 
 // The stock target is the knee alone, so "flat + knee + bump" measures as an error equal to the bump.
 const bump = (f: number) => 1.5 * Math.exp(-(Math.log2(f / 8000) ** 2) / (2 * 0.3 ** 2));
-const measuredFn = (f: number) => 70 + hfKneeGain(f) + bump(f);
+const measuredFn = (f: number) => 70 + rolloffGain(2, f) + bump(f);
 const file = (name: string, fn = measuredFn) => ({ name, text: synthRewText(fn) });
 const NOW = new Date('2026-09-20T12:00:00Z');
 
@@ -64,7 +64,43 @@ describe('generateCorrection', () => {
     const ady = measuredAdy();
     ady.enTargetCurveType = 0;
     expect(() => generateCorrection(ady, [{ commandId: 'FL', files: [file('L1.txt')] }], '')).toThrow(GenerateError);
-    expect(() => generateCorrection(ady, [{ commandId: 'FL', files: [file('L1.txt')] }], '')).toThrow(/enTargetCurveType/);
+    expect(() => generateCorrection(ady, [{ commandId: 'FL', files: [file('L1.txt')] }], '')).toThrow(/enTargetCurveType 0/);
+  });
+
+  it('accepts a type-1 .ady and uses the Roll Off 1 shape for the target', () => {
+    const ady = measuredAdy();
+    ady.enTargetCurveType = 1;
+    const one = (f: number) => 70 + rolloffGain(1, f) + bump(f);
+    const { correction, warnings } = generateCorrection(
+      ady,
+      [{ commandId: 'FL', files: [file('L1.txt', one)] }],
+      '',
+      NOW
+    );
+    const i = logGrid().findIndex((f) => f >= 8000);
+    expect(correction.channels.FL.error[i]).toBeCloseTo(1.5, 1);
+    expect(warnings).toEqual([]);
+  });
+
+  it('a Roll Off 2 measurement read as type 1 shows the difference between the shapes', () => {
+    const ady = measuredAdy();
+    ady.enTargetCurveType = 1;
+    const { correction } = generateCorrection(ady, [{ commandId: 'FL', files: [file('L1.txt')] }], '', NOW);
+    const grid = logGrid();
+    // 12.5 kHz: Roll Off 2 is about 1.5 dB lower than Roll Off 1 there, and the 8 kHz test bump is negligible
+    const i = grid.findIndex((f) => f >= 12500);
+    expect(correction.channels.FL.error[i]).toBeLessThan(-1);
+  });
+
+  it('checkMeasuredType returns the type for 1 and 2 and refuses everything else naming the supported values', () => {
+    const ady = measuredAdy();
+    ady.enTargetCurveType = 1;
+    expect(checkMeasuredType(ady)).toBe(1);
+    ady.enTargetCurveType = 2;
+    expect(checkMeasuredType(ady)).toBe(2);
+    ady.enTargetCurveType = 3;
+    expect(() => checkMeasuredType(ady)).toThrow(GenerateError);
+    expect(() => checkMeasuredType(ady)).toThrow(/1 and 2/);
   });
 
   it('throws when no speaker has any files', () => {
@@ -94,7 +130,7 @@ describe('generateCorrection', () => {
   });
 
   it('warns when a speaker looks far off, without blocking', () => {
-    const wild = (f: number) => 70 + hfKneeGain(f) + (f > 3000 ? 10 : 0);
+    const wild = (f: number) => 70 + rolloffGain(2, f) + (f > 3000 ? 10 : 0);
     const { correction, warnings } = generateCorrection(
       measuredAdy(),
       [{ commandId: 'FL', files: [file('L1.txt', wild)] }],

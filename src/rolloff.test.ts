@@ -57,3 +57,47 @@ describe('interpolation and clamping', () => {
     expect(rolloffGain(2, 1000000)).toBe(rolloffGain(2, 20000));
   });
 });
+
+describe('rolloffGain type 2 (previous hfKnee tests)', () => {
+  it('is exactly 0dB at the first extracted point (20Hz)', () => {
+    expect(rolloffGain(2, 20)).toBeCloseTo(0, 6);
+  });
+
+  it('is 0dB well below the knee (100Hz)', () => {
+    expect(rolloffGain(2, 100)).toBeCloseTo(0, 4);
+  });
+
+  it('is 0dB at 1kHz (flat midrange)', () => {
+    expect(rolloffGain(2, 1000)).toBeCloseTo(0, 4);
+  });
+
+  it('is -0.5772dB at 5kHz', () => {
+    expect(rolloffGain(2, 5000)).toBeCloseTo(-0.5772, 4);
+  });
+
+  it('is -3.4632dB at 10kHz', () => {
+    expect(rolloffGain(2, 10000)).toBeCloseTo(-3.4632, 4);
+  });
+
+  it('is exactly -6.1328dB at the last extracted point (20kHz)', () => {
+    expect(rolloffGain(2, 20000)).toBeCloseTo(-6.1328, 4);
+  });
+
+  it('clamps to the first extracted value below 20Hz', () => {
+    expect(rolloffGain(2, 10)).toBeCloseTo(0, 6);
+  });
+
+  it('clamps to the last extracted value above 20kHz', () => {
+    expect(rolloffGain(2, 30000)).toBeCloseTo(-6.1328, 4);
+  });
+
+  it('interpolates monotonically between two adjacent extracted points', () => {
+    // sanity check: gain should move smoothly, not jump, between neighboring
+    // points once inside the knee region
+    const a = rolloffGain(2, 9990);
+    const mid = rolloffGain(2, 9995);
+    const b = rolloffGain(2, 10000);
+    expect(mid).toBeGreaterThanOrEqual(Math.min(a, b) - 1e-6);
+    expect(mid).toBeLessThanOrEqual(Math.max(a, b) + 1e-6);
+  });
+});

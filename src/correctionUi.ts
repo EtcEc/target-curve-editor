@@ -8,7 +8,7 @@ import {
   type CorrectionFile,
 } from './correction';
 import type { TrimFn } from './curve';
-import { REQUIRED_TARGET_CURVE_TYPE, generateCorrection, type GenerateResult, type SpeakerInput } from './generate';
+import { checkMeasuredType, generateCorrection, type GenerateResult, type SpeakerInput } from './generate';
 
 export interface CorrectionUi {
   /** Tells the UI which channels the loaded base .ady has, for the summary table. */
@@ -207,11 +207,7 @@ export function initCorrectionUi(onChange: () => void): CorrectionUi {
     }
     try {
       const parsed = parseAdy(await file.text());
-      if (parsed.enTargetCurveType !== REQUIRED_TARGET_CURVE_TYPE) {
-        throw new Error(
-          `That .ady has enTargetCurveType ${parsed.enTargetCurveType}; it must be ${REQUIRED_TARGET_CURVE_TYPE} (the value this tool writes).`
-        );
-      }
+      checkMeasuredType(parsed);
       measuredAdy = parsed;
       show(generateError, null);
       buildRows(parsed);

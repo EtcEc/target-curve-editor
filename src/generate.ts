@@ -2,14 +2,27 @@ import { isSubwooferChannel, type AdyFile } from './ady';
 import { createCorrection, type CorrectionChannel, type CorrectionFile } from './correction';
 import { computeError, rmsOver } from './measuredError';
 import { parseRewText } from './rewParse';
-
-/** The HF knee is only valid for this target curve type, so the measured file must use it. */
-export const REQUIRED_TARGET_CURVE_TYPE = 2;
+import { ROLLOFF_TYPES, isRolloffType, type RolloffType } from './rolloff';
 
 /** RMS error (dB, 2-20 kHz) above which a speaker gets a warning. */
 const RMS_WARNING_DB = 4;
 
 export class GenerateError extends Error {}
+
+/**
+ * The HF rolloff type the measured .ady was made with. Only types 1 and 2 have
+ * a known shape, so anything else is refused.
+ */
+export function checkMeasuredType(ady: AdyFile): RolloffType {
+  const type = ady.enTargetCurveType;
+  if (!isRolloffType(type)) {
+    throw new GenerateError(
+      `That .ady has enTargetCurveType ${type}; this tool supports ${ROLLOFF_TYPES.join(' and ')} ` +
+        `(High Frequency Roll Off ${ROLLOFF_TYPES.join(' and ')}).`
+    );
+  }
+  return type;
+}
 
 export interface SpeakerInput {
   commandId: string;
@@ -40,11 +53,7 @@ export function generateCorrection(
   label: string,
   now: Date = new Date()
 ): GenerateResult {
-  if (measuredAdy.enTargetCurveType !== REQUIRED_TARGET_CURVE_TYPE) {
-    throw new GenerateError(
-      `The measured .ady must have enTargetCurveType ${REQUIRED_TARGET_CURVE_TYPE}, but this one has ${measuredAdy.enTargetCurveType}.`
-    );
-  }
+  const rolloffType = checkMeasuredType(measuredAdy);
   const active = speakers.filter((s) => s.files.length > 0);
   if (active.length === 0) throw new GenerateError('No measurement files were given.');
 
@@ -63,7 +72,7 @@ export function generateCorrection(
     }
 
     const measurements = speaker.files.map((f) => parseRewText(f.text, f.name));
-    const error = computeError(measurements, channel);
+    const error = computeError(measurements, channel, rolloffType);
     const rmsError = rmsOver(error, 2000, 20000);
 
     channels[speaker.commandId] = { positions: measurements.length, error };

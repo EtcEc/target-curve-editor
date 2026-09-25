@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { AdyChannel } from './ady';
-import { hfKneeGain } from './hfKnee';
+import { rolloffGain } from './rolloff';
 import {
   TargetParseError,
   averagePositions,
@@ -121,31 +121,41 @@ function pointsFor(fn: (f: number) => number): string[] {
 describe('effectiveTarget', () => {
   it('is the knee alone for a channel with no custom points (stock calibration)', () => {
     const grid = logGrid();
-    const target = effectiveTarget(channelWith([]));
-    expect(target[grid.length - 1]).toBeCloseTo(hfKneeGain(20000), 3);
+    const target = effectiveTarget(channelWith([]), 2);
+    expect(target[grid.length - 1]).toBeCloseTo(rolloffGain(2, 20000), 3);
     expect(target[grid.findIndex((f) => f >= 1000)]).toBeCloseTo(0, 2);
   });
 
   it('ignores a constant offset in the written points', () => {
-    const stock = effectiveTarget(channelWith([]));
-    const offset = effectiveTarget(channelWith(pointsFor(() => 4.5)));
+    const stock = effectiveTarget(channelWith([]), 2);
+    const offset = effectiveTarget(channelWith(pointsFor(() => 4.5)), 2);
     offset.forEach((v, i) => expect(v).toBeCloseTo(stock[i], 6));
   });
 
   it('adds the knee on top of the written curve', () => {
     const tilt = (f: number) => -0.7 * Math.log2(f / 1000);
     const grid = logGrid();
-    const target = effectiveTarget(channelWith(pointsFor(tilt)));
+    const target = effectiveTarget(channelWith(pointsFor(tilt)), 2);
     // level normalisation shifts everything by a constant, so compare differences
     const i = grid.findIndex((f) => f >= 10000);
     const j = grid.findIndex((f) => f >= 1000);
-    const raw = (f: number) => tilt(f) + hfKneeGain(f);
+    const raw = (f: number) => tilt(f) + rolloffGain(2, f);
     expect(target[i] - target[j]).toBeCloseTo(raw(grid[i]) - raw(grid[j]), 2);
   });
 
   it('throws TargetParseError for a point it cannot read', () => {
-    expect(() => effectiveTarget(channelWith(['{20.0 4.5}']))).toThrow(TargetParseError);
-    expect(() => effectiveTarget(channelWith(['{20.0 4.5}']))).toThrow(/FL/);
+    expect(() => effectiveTarget(channelWith(['{20.0 4.5}']), 2)).toThrow(TargetParseError);
+    expect(() => effectiveTarget(channelWith(['{20.0 4.5}']), 2)).toThrow(/FL/);
+  });
+
+  it('uses the shape of the given rolloff type', () => {
+    const grid = logGrid();
+    const one = effectiveTarget(channelWith([]), 1);
+    const two = effectiveTarget(channelWith([]), 2);
+    const i = grid.findIndex((f) => f >= 10000);
+    // both are ~0 dB across 500-1500 Hz, so level normalisation shifts them equally
+    expect(one[i] - two[i]).toBeCloseTo(rolloffGain(1, grid[i]) - rolloffGain(2, grid[i]), 3);
+    expect(one[i]).toBeGreaterThan(two[i] + 1);
   });
 });
 
@@ -154,11 +164,11 @@ describe('computeError', () => {
   const bump = (f: number) => 1.5 * Math.exp(-(Math.log2(f / 8000) ** 2) / (2 * 0.3 ** 2));
   const channel = () => channelWith(pointsFor(tilt));
   // a chain that delivers exactly written + knee, plus a planted error bump at 8 kHz
-  const measuredFn = (f: number) => 70 + tilt(f) + hfKneeGain(f) + bump(f);
+  const measuredFn = (f: number) => 70 + tilt(f) + rolloffGain(2, f) + bump(f);
 
   it('recovers a planted error shape', () => {
     const grid = logGrid();
-    const error = computeError([synthMeasurement(measuredFn)], channel());
+    const error = computeError([synthMeasurement(measuredFn)], channel(), 2);
     expect(error).toHaveLength(241);
     expect(error[grid.findIndex((f) => f >= 8000)]).toBeCloseTo(1.5, 1);
     expect(error[grid.findIndex((f) => f >= 1000)]).toBeCloseTo(0, 1);
@@ -167,18 +177,18 @@ describe('computeError', () => {
 
   it('is near zero everywhere for a chain that hits the target exactly', () => {
     // 0.3 dB rather than tighter: the smoothing window at the 20 kHz edge is one-sided
-    const error = computeError([synthMeasurement((f) => 70 + tilt(f) + hfKneeGain(f))], channel());
+    const error = computeError([synthMeasurement((f) => 70 + tilt(f) + rolloffGain(2, f))], channel(), 2);
     for (const v of error) expect(Math.abs(v)).toBeLessThan(0.3);
   });
 
   it('averages files that use different frequency grids', () => {
     const smooth = (f: number) => 70 + 3 * Math.sin(Math.log2(f));
-    const single = computeError([synthMeasurement(smooth, 3000)], channelWith([]));
-    const mixed = computeError([synthMeasurement(smooth, 3000), synthMeasurement(smooth, 1500)], channelWith([]));
+    const single = computeError([synthMeasurement(smooth, 3000)], channelWith([]), 2);
+    const mixed = computeError([synthMeasurement(smooth, 3000), synthMeasurement(smooth, 1500)], channelWith([]), 2);
     single.forEach((v, i) => expect(Math.abs(v - mixed[i])).toBeLessThan(0.05));
   });
 
   it('throws when given no measurements', () => {
-    expect(() => computeError([], channel())).toThrow();
+    expect(() => computeError([], channel(), 2)).toThrow();
   });
 });

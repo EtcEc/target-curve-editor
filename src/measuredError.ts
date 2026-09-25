@@ -1,5 +1,5 @@
 import type { AdyChannel } from './ady';
-import { hfKneeGain } from './hfKnee';
+import { rolloffGain, type RolloffType } from './rolloff';
 import { interpLogFreq } from './logInterp';
 import type { RewMeasurement } from './rewParse';
 
@@ -121,13 +121,13 @@ function writtenCurve(channel: AdyChannel): number[] {
 
 /**
  * What Audyssey is actually aiming for on this channel: the written curve plus
- * the HF knee it always applies on top (the knee alone for a stock
+ * the HF rolloff it always applies on top (the rolloff alone for a stock
  * calibration), level-normalised so only shape matters.
  */
-export function effectiveTarget(channel: AdyChannel): number[] {
+export function effectiveTarget(channel: AdyChannel, rolloffType: RolloffType): number[] {
   const grid = logGrid();
   const written = writtenCurve(channel);
-  return normalizeLevel(grid.map((f, i) => written[i] + hfKneeGain(f)));
+  return normalizeLevel(grid.map((f, i) => written[i] + rolloffGain(rolloffType, f)));
 }
 
 /**
@@ -135,9 +135,13 @@ export function effectiveTarget(channel: AdyChannel): number[] {
  * power-averaged across positions and level-normalised, then the channel's
  * effective target is subtracted.
  */
-export function computeError(measurements: readonly RewMeasurement[], channel: AdyChannel): number[] {
+export function computeError(
+  measurements: readonly RewMeasurement[],
+  channel: AdyChannel,
+  rolloffType: RolloffType
+): number[] {
   if (measurements.length === 0) throw new Error('computeError: no measurements');
   const measured = normalizeLevel(averagePositions(measurements.map(smoothToGrid)));
-  const target = effectiveTarget(channel);
+  const target = effectiveTarget(channel, rolloffType);
   return measured.map((v, i) => v - target[i]);
 }
