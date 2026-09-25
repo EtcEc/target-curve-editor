@@ -24,11 +24,6 @@ body {
   color: #fc6;
 }
 
-#controls label {
-  display: block;
-  margin-bottom: 0.75rem;
-}
-
 #chart {
   margin: 1rem 0;
 }

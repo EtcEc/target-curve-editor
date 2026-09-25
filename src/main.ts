@@ -98,13 +98,7 @@ function loadFile(file: File): void {
       downloadSection.hidden = false;
       editorPlaceholder.hidden = true;
       downloadPlaceholder.hidden = true;
-      renderChannelSummary();
-      renderDownloadSummary();
-      if (!chart) {
-        chart = createChart(chartContainer, params);
-      } else {
-        updateChart(chart, params);
-      }
+      if (!chart) chart = createChart(chartContainer, params);
       bandsUi.render();
       onParamsChanged();
     } catch (err) {
@@ -123,7 +117,8 @@ function loadFile(file: File): void {
 function renderChannelSummary(): void {
   if (!currentAdy) return;
   channelSummaryBody.innerHTML = '';
-  const trimShift = computeTrimShift(params);
+  const valid = validateBands(params.bands) === null;
+  const trimShift = valid ? computeTrimShift(params) : 0;
   let anySubwoofer = false;
 
   for (const channel of currentAdy.detectedChannels) {
@@ -140,7 +135,7 @@ function renderChannelSummary(): void {
     row.appendChild(roleCell);
 
     const trimCell = document.createElement('td');
-    trimCell.textContent = isSub ? (params.subTrim ? trimShift.toFixed(2) : 'skipped') : '—';
+    trimCell.textContent = isSub && valid ? (params.subTrim ? trimShift.toFixed(2) : 'skipped') : '—';
     row.appendChild(trimCell);
 
     channelSummaryBody.appendChild(row);
@@ -163,7 +158,13 @@ function onParamsChanged(): void {
   bandError.textContent = problem ?? '';
   bandError.hidden = problem === null;
   downloadButton.disabled = problem !== null;
-  if (problem !== null) return; // keep the last good chart; nothing is exported meanwhile
+  if (problem !== null) {
+    // keep the last good chart; nothing is exported meanwhile
+    bandLevel.textContent = '';
+    downloadSummary.textContent = 'Fix the band values above to see what the download will contain.';
+    renderChannelSummary();
+    return;
+  }
   bandLevel.textContent = `Level at 20 Hz: ${sumBands(20, params.bands).toFixed(2)} dB`;
   if (chart) updateChart(chart, params);
   if (currentAdy) {

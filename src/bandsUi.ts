@@ -56,6 +56,10 @@ export function initBandsUi(params: CurveParams, onChange: () => void): { render
     addType.appendChild(option);
   }
 
+  function clearPresetDescription(): void {
+    presetDescription.textContent = '';
+  }
+
   function renderRow(band: Band, index: number): HTMLElement {
     const row = document.createElement('div');
     row.className = 'band';
@@ -67,8 +71,10 @@ export function initBandsUi(params: CurveParams, onChange: () => void): { render
     enabled.type = 'checkbox';
     enabled.checked = band.enabled;
     enabled.title = 'Enable or disable this band';
+    enabled.setAttribute('aria-label', `Enable band ${index + 1}`);
     enabled.addEventListener('change', () => {
       band.enabled = enabled.checked;
+      clearPresetDescription();
       row.classList.toggle('band-off', !band.enabled);
       onChange();
     });
@@ -82,7 +88,9 @@ export function initBandsUi(params: CurveParams, onChange: () => void): { render
     remove.type = 'button';
     remove.textContent = '✕';
     remove.title = 'Delete this band';
+    remove.setAttribute('aria-label', `Delete band ${index + 1}`);
     remove.addEventListener('click', () => {
+      clearPresetDescription();
       params.bands.splice(index, 1);
       render();
       onChange();
@@ -103,7 +111,12 @@ export function initBandsUi(params: CurveParams, onChange: () => void): { render
         const value = parseFloat(input.value);
         if (!Number.isFinite(value)) return; // cleared or invalid: keep the last value
         (band as unknown as Record<string, number>)[spec.key] = value;
+        clearPresetDescription();
         onChange();
+      });
+      // a cleared/invalid field snaps back to the model's value on blur/commit
+      input.addEventListener('change', () => {
+        input.value = String((band as unknown as Record<string, number>)[spec.key]);
       });
       label.appendChild(input);
       fields.appendChild(label);
@@ -136,6 +149,7 @@ export function initBandsUi(params: CurveParams, onChange: () => void): { render
 
   addButton.addEventListener('click', () => {
     params.bands.push(defaultBand(addType.value as BandType));
+    clearPresetDescription();
     render();
     onChange();
   });
