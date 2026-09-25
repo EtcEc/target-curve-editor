@@ -1,0 +1,59 @@
+import { describe, expect, it } from 'vitest';
+import { ROLLOFF_TYPES, isRolloffType, rolloffGain } from './rolloff';
+
+describe('isRolloffType', () => {
+  it('accepts exactly 1 and 2', () => {
+    expect(ROLLOFF_TYPES).toEqual([1, 2]);
+    expect(isRolloffType(1)).toBe(true);
+    expect(isRolloffType(2)).toBe(true);
+    expect(isRolloffType(0)).toBe(false);
+    expect(isRolloffType(3)).toBe(false);
+    expect(isRolloffType(1.5)).toBe(false);
+  });
+});
+
+describe('rolloffGain type 2 (High Frequency Roll Off 2)', () => {
+  it('is 0 dB at the bottom and through the midrange', () => {
+    expect(rolloffGain(2, 20)).toBeCloseTo(0, 6);
+    expect(rolloffGain(2, 100)).toBeCloseTo(0, 4);
+    expect(rolloffGain(2, 1000)).toBeCloseTo(0, 4);
+  });
+
+  it('matches the extracted table at known points', () => {
+    expect(rolloffGain(2, 5000)).toBeCloseTo(-0.5772, 4);
+    expect(rolloffGain(2, 10000)).toBeCloseTo(-3.4632, 3);
+    expect(rolloffGain(2, 20000)).toBeCloseTo(-6.1328, 3);
+  });
+});
+
+describe('rolloffGain type 1 (High Frequency Roll Off 1)', () => {
+  it('is flat 0 dB below 2.5 kHz', () => {
+    for (const f of [20, 100, 1000, 2000, 2500]) expect(rolloffGain(1, f)).toBe(0);
+  });
+
+  it('has the extracted shape at 10 kHz and 20 kHz', () => {
+    expect(Math.abs(rolloffGain(1, 10000) - -1.87)).toBeLessThan(0.1);
+    expect(Math.abs(rolloffGain(1, 20000) - -6.7)).toBeLessThan(0.2);
+  });
+
+  it('is gentler than type 2 through the upper midrange and steeper right at the top', () => {
+    expect(rolloffGain(1, 10000)).toBeGreaterThan(rolloffGain(2, 10000) + 1);
+    expect(rolloffGain(1, 8000)).toBeGreaterThan(rolloffGain(2, 8000) + 0.8);
+    expect(rolloffGain(1, 20000)).toBeLessThan(rolloffGain(2, 20000));
+  });
+});
+
+describe('interpolation and clamping', () => {
+  it('interpolates in log-frequency between table points', () => {
+    const a = rolloffGain(1, 9000);
+    const b = rolloffGain(1, 11000);
+    const mid = rolloffGain(1, Math.sqrt(9000 * 11000));
+    expect(mid).toBeCloseTo((a + b) / 2, 1);
+  });
+
+  it('clamps outside the table to its end values', () => {
+    expect(rolloffGain(1, 1)).toBe(rolloffGain(1, 20));
+    expect(rolloffGain(1, 1000000)).toBe(rolloffGain(1, 19999));
+    expect(rolloffGain(2, 1000000)).toBe(rolloffGain(2, 20000));
+  });
+});
