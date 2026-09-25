@@ -23,6 +23,9 @@ Y_PLUS20, Y_MINUS25 = 249.0, 875.0  # pixel rows of the +20 dB and -25 dB gridli
 X_FIRST, X_LAST = 240, 2297         # first/last pixel column of the plot (20 Hz .. 20 kHz)
 PLOT = (236, 2302, 246, 948)        # x0, x1, y0, y1 of the plot area, for gridline detection
 FLAT_BELOW_HZ = 3000.0              # the curve is visibly flat here; pixel noise is +-0.05 dB
+X_TAIL_TRUSTED = 2288               # the red line has a rounded end: past this column its thickness shrinks
+                                    # (9 px -> 4 px) and the mean height stops following the curve
+TAIL_FIT_COLUMNS = 24               # the trend before that point is extrapolated with a straight line
 
 
 def groups(indices):
@@ -60,15 +63,29 @@ def main(png_path, out_path):
     px_per_db = (Y_MINUS25 - Y_PLUS20) / 45
     y_zero = Y_PLUS20 + 20 * px_per_db
 
-    freqs, gains = [], []
+    cols, freqs, raw = [], [], []
     for x in range(X_FIRST, X_LAST + 1):
         ys = np.where(red[:, x])[0]
         if len(ys) == 0:
             continue
-        f = 100 * 10 ** ((x - X_100HZ) / px_per_decade)
-        gain = (y_zero - ys.mean()) / px_per_db
-        freqs.append(round(float(f), 4))
-        gains.append(0.0 if f <= FLAT_BELOW_HZ else round(float(gain), 4))
+        cols.append(x)
+        freqs.append(100 * 10 ** ((x - X_100HZ) / px_per_decade))
+        raw.append((y_zero - ys.mean()) / px_per_db)
+    cols, freqs, raw = np.array(cols), np.array(freqs), np.array(raw)
+
+    # replace the distorted tail (rounded line end) by the straight-line trend of the columns before it
+    fit = (cols > X_TAIL_TRUSTED - TAIL_FIT_COLUMNS) & (cols <= X_TAIL_TRUSTED)
+    slope, intercept = np.polyfit(cols[fit], raw[fit], 1)
+    tail = cols > X_TAIL_TRUSTED
+    raw[tail] = slope * cols[tail] + intercept
+
+    # the plot ends exactly at 20 kHz, slightly past the last red column: add that point explicitly
+    x_20khz = X_100HZ + (np.log10(20000) - 2) * px_per_decade
+    freqs = np.append(freqs, 20000.0)
+    raw = np.append(raw, slope * x_20khz + intercept)
+
+    gains = [0.0 if f <= FLAT_BELOW_HZ else round(float(g), 4) for f, g in zip(freqs, raw)]
+    freqs = [round(float(f), 4) for f in freqs]
 
     with open(out_path, "w") as fh:
         json.dump({"frequency": freqs, "gain": gains}, fh)

@@ -89,8 +89,9 @@ log-frequency, never as fitted formulas. The existing table
 (`src/hfKneeData.json`) is Roll Off 2. Roll Off 1 is extracted from a
 MultEQ-X Curve Editor screenshot (zero custom curve) using gridline
 calibration of both axes; only the resulting table is committed, never the
-screenshot. Sanity values: about -1.9 dB at 10 kHz and -6.7 dB at 20 kHz, flat
-below about 3 kHz; Roll Off 2 is -3.5 dB and -6.1 dB at the same points.
+screenshot. Sanity values: about -1.9 dB at 10 kHz and -7.1 dB at 20 kHz (the
+last columns of the drawn line are distorted by its rounded end, so the tail is
+extrapolated from the trend before it), flat below about 3 kHz; Roll Off 2 is -3.5 dB and -6.1 dB at the same points.
 
 - A **Rolloff type** selector chooses the shape. On loading a `.ady` it is set
   from that file's `enTargetCurveType`; an unrecognised value falls back to

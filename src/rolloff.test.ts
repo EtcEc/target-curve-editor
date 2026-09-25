@@ -33,7 +33,17 @@ describe('rolloffGain type 1 (High Frequency Roll Off 1)', () => {
 
   it('has the extracted shape at 10 kHz and 20 kHz', () => {
     expect(Math.abs(rolloffGain(1, 10000) - -1.87)).toBeLessThan(0.1);
-    expect(Math.abs(rolloffGain(1, 20000) - -6.7)).toBeLessThan(0.2);
+    expect(Math.abs(rolloffGain(1, 20000) - -7.09)).toBeLessThan(0.15);
+  });
+
+  it('falls steadily to the very top with no kink or plateau (the last points come from a straight-line extrapolation)', () => {
+    let previous = rolloffGain(1, 18000);
+    for (let f = 18100; f <= 20000; f += 100) {
+      const g = rolloffGain(1, f);
+      expect(g).toBeLessThan(previous); // strictly falling
+      expect(previous - g).toBeLessThan(0.12); // and no jump
+      previous = g;
+    }
   });
 
   it('is gentler than type 2 through the upper midrange and steeper right at the top', () => {
@@ -53,7 +63,7 @@ describe('interpolation and clamping', () => {
 
   it('clamps outside the table to its end values', () => {
     expect(rolloffGain(1, 1)).toBe(rolloffGain(1, 20));
-    expect(rolloffGain(1, 1000000)).toBe(rolloffGain(1, 19999));
+    expect(rolloffGain(1, 1000000)).toBe(rolloffGain(1, 20000));
     expect(rolloffGain(2, 1000000)).toBe(rolloffGain(2, 20000));
   });
 });
