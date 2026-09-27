@@ -216,3 +216,24 @@ logic on the design page.
 - The Design page puts "Save or load a design" in its own card below the bands
   card, rather than inside the presets card.
 - On the Correct page a speaker whose channel has no custom curve gets no file input and the note "No target curve in this file, so it is left unchanged." instead of an error; a file with no curves at all is refused at load. The download checklist states the fade range (cutoff ÷ √2 to cutoff × √2).
+
+## Correction settings (added 2026-09-27)
+
+Three settings on the Correct page, next to the cutoff, each a slider with its
+value shown beside it. They start at their defaults on every visit and are not
+remembered. Changing any of them updates the table, the preview chart and the
+download checklist live.
+
+- **Detail**: the width (octaves) the measured error is averaged over before it
+  becomes a trim. Steps ⅓, ½, ⅔, 1, 1½, 2, 3; default 1 (today's behaviour).
+  Smaller follows narrower features, larger corrects only broad trends.
+- **Strength**: the fraction of the error that is corrected, 0-100 % in 10 %
+  steps; default 100 %.
+- **Limit**: the largest cut or boost, 0.5-10 dB in 0.5 dB steps; default 3 dB
+  (today's fixed clamp). It caps what is written, after strength is applied.
+
+Trim pipeline: average over the detail width, re-pin at 1 kHz, scale by
+strength, clamp to ±limit, fade in around the cutoff, negate. The 1 kHz pin and
+"nothing below the fade" hold for every setting. The download checklist adds a
+line such as "Detail 1 oct · strength 100% · limit ±3 dB". Audyssey applies its
+own limits on top, so large settings can only over-promise, not harm.
