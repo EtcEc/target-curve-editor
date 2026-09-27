@@ -171,6 +171,10 @@ function onParamsChanged(): void {
     chart?.redraw(false, false);
     bandLevel.textContent = '';
     subTrimPeak.hidden = true;
+    if (currentAdy) {
+      const subIds = currentAdy.detectedChannels.filter(isSubwooferChannel).map((c) => c.commandId);
+      noSubwooferWarning.hidden = subIds.length > 0;
+    }
     renderChecklist(downloadSummary, [
       { text: 'Fix the band values above to see what the download will contain.', on: false },
     ]);

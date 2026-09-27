@@ -1,6 +1,6 @@
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
-import { baseChartOptions, fitChart } from '../chart';
+import { baseChartOptions, chartHeight, fitChart } from '../chart';
 import type { PreviewCurves } from '../correctionPreview';
 import { logGrid } from '../measuredError';
 
@@ -15,7 +15,7 @@ export function createPreviewChart(container: HTMLElement): uPlot {
   const opts: uPlot.Options = {
     ...baseChartOptions(),
     width: container.clientWidth || 800,
-    height: 420,
+    height: chartHeight(),
     series: [
       {},
       { label: 'Current target', stroke: '#9aa0ad', width: 1.5 },

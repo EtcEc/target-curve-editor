@@ -8,7 +8,7 @@ import { SLOT_COLORS, SLOT_IDS } from './slots';
 /** Wide screens show the chart beside the tools; narrow ones stick a short chart above them. */
 const WIDE_LAYOUT = '(min-width: 960px)';
 
-function chartHeight(): number {
+export function chartHeight(): number {
   return window.matchMedia(WIDE_LAYOUT).matches ? 420 : 220;
 }
 

@@ -260,7 +260,7 @@ function cutoffValid(): boolean {
 
 cutoffInput.addEventListener('input', () => {
   if (!cutoffValid()) return;
-  cutoffHz = Number(cutoffInput.value);
+  cutoffHz = Math.round(Number(cutoffInput.value));
   render();
 });
 
