@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { AdyChannel } from './ady';
 import { rolloffGain } from './rolloff';
+import { TargetParseError } from './curvePoints';
 import {
-  TargetParseError,
   averagePositions,
   computeError,
   effectiveTarget,

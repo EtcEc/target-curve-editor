@@ -4,8 +4,6 @@ import { interpLogFreq } from './logInterp';
 import type { RewMeasurement } from './rewParse';
 import { readCurvePoints } from './curvePoints';
 
-export { TargetParseError } from './curvePoints';
-
 const START_HZ = 20;
 const END_HZ = 20000;
 const STEPS_PER_OCTAVE = 24;

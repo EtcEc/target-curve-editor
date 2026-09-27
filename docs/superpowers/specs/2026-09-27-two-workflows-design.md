@@ -215,3 +215,4 @@ logic on the design page.
 
 - The Design page puts "Save or load a design" in its own card below the bands
   card, rather than inside the presets card.
+- On the Correct page a speaker whose channel has no custom curve gets no file input and the note "No target curve in this file, so it is left unchanged." instead of an error; a file with no curves at all is refused at load. The download checklist states the fade range (cutoff ÷ √2 to cutoff × √2).
