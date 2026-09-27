@@ -2,8 +2,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { parseAdy } from '../src/ady';
-import { buildChannelTrims } from '../src/correction';
-import { generateCorrection } from '../src/generate';
+import { DEFAULT_CUTOFF_HZ, buildChannelTrims } from '../src/correction';
+import { measureCorrection } from '../src/generate';
 import { logGrid } from '../src/measuredError';
 
 /**
@@ -35,14 +35,14 @@ function load() {
         .map((name) => ({ name, text: readFileSync(join(dir as string, name), 'utf8') })),
     }))
     .filter((s) => s.files.length > 0 && ady.detectedChannels.some((c) => c.commandId === s.commandId));
-  return { speakers, result: generateCorrection(ady, speakers, 'acceptance') };
+  return { speakers, result: measureCorrection(ady, speakers) };
 }
 
 describe.skipIf(!adyPath || !dir)('local acceptance: real measurement session', () => {
   it('finds speakers and averages every position file it was given', () => {
     const { speakers, result } = load();
     expect(speakers.length).toBeGreaterThan(0);
-    for (const s of speakers) expect(result.correction.channels[s.commandId].positions).toBe(s.files.length);
+    for (const s of speakers) expect(result.correction[s.commandId].positions).toBe(s.files.length);
   });
 
   it('gives no far-off warnings: the target the tool reads back matches what was measured', () => {
@@ -51,18 +51,19 @@ describe.skipIf(!adyPath || !dir)('local acceptance: real measurement session', 
 
   it('has a finite error curve on the shared grid for every speaker', () => {
     const { result } = load();
-    for (const channel of Object.values(result.correction.channels)) {
+    for (const channel of Object.values(result.correction)) {
       expect(channel.error).toHaveLength(logGrid().length);
       expect(channel.error.every(Number.isFinite)).toBe(true);
     }
   });
 
-  it('keeps every derived trim within the +-3 dB clamp and zero well below the cutoff', () => {
+  it('keeps every trim within +-3 dB, zero well below the cutoff and pinned at 1 kHz', () => {
     const { result } = load();
-    const trims = buildChannelTrims(result.correction, 2000);
+    const trims = buildChannelTrims(result.correction, DEFAULT_CUTOFF_HZ);
     for (const trim of trims.values()) {
       for (const f of logGrid()) expect(Math.abs(trim(f))).toBeLessThanOrEqual(3 + 1e-9);
       expect(trim(200)).toBeCloseTo(0, 6);
+      expect(Math.abs(trim(1000))).toBeLessThan(0.01);
     }
   });
 });

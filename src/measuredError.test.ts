@@ -87,12 +87,12 @@ describe('normalizeLevel', () => {
     for (const v of normalizeLevel(logGrid().map(() => 73))) expect(v).toBeCloseTo(0, 9);
   });
 
-  it('preserves shape and zeroes the 500-1500 Hz mean', () => {
+  it('preserves shape and zeroes the mean over the octave around 1 kHz', () => {
     const grid = logGrid();
     const curve = grid.map((_, i) => 73 + i * 0.01);
     const out = normalizeLevel(curve);
     expect(out[10] - out[0]).toBeCloseTo(0.1, 9);
-    const band = out.filter((_, i) => grid[i] >= 500 && grid[i] <= 1500);
+    const band = out.filter((_, i) => grid[i] >= 1000 / Math.SQRT2 && grid[i] <= 1000 * Math.SQRT2);
     expect(band.reduce((a, b) => a + b, 0) / band.length).toBeCloseTo(0, 9);
   });
 });
@@ -153,7 +153,7 @@ describe('effectiveTarget', () => {
     const one = effectiveTarget(channelWith([]), 1);
     const two = effectiveTarget(channelWith([]), 2);
     const i = grid.findIndex((f) => f >= 10000);
-    // both are ~0 dB across 500-1500 Hz, so level normalisation shifts them equally
+    // both are ~0 dB around 1 kHz, so level normalisation shifts them equally
     expect(one[i] - two[i]).toBeCloseTo(rolloffGain(1, grid[i]) - rolloffGain(2, grid[i]), 3);
     expect(one[i]).toBeGreaterThan(two[i] + 1);
   });

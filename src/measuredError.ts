@@ -2,13 +2,18 @@ import type { AdyChannel } from './ady';
 import { rolloffGain, type RolloffType } from './rolloff';
 import { interpLogFreq } from './logInterp';
 import type { RewMeasurement } from './rewParse';
+import { readCurvePoints } from './curvePoints';
+
+export { TargetParseError } from './curvePoints';
 
 const START_HZ = 20;
 const END_HZ = 20000;
 const STEPS_PER_OCTAVE = 24;
 const SMOOTHING_OCTAVES = 1 / 6;
-const NORMALIZE_LO_HZ = 500;
-const NORMALIZE_HI_HZ = 1500;
+/** Measurements and targets are lined up at 1 kHz: over the octave centred on it. */
+export const ANCHOR_HZ = 1000;
+const NORMALIZE_LO_HZ = ANCHOR_HZ / Math.SQRT2;
+const NORMALIZE_HI_HZ = ANCHOR_HZ * Math.SQRT2;
 
 /**
  * The shared log grid: 20 * 2^(i/24) for i = 0..239, plus a final point at
@@ -65,7 +70,7 @@ export function averagePositions(curves: readonly number[][]): number[] {
   });
 }
 
-/** Subtracts the mean level over 500-1500 Hz so only shape is left. */
+/** Subtracts the mean level over the octave around 1 kHz so only shape is left. */
 export function normalizeLevel(curve: readonly number[]): number[] {
   const grid = logGrid();
   let sum = 0;
@@ -94,29 +99,12 @@ export function rmsOver(curve: readonly number[], loHz: number, hiHz: number): n
   return count === 0 ? 0 : Math.sqrt(sum / count);
 }
 
-/** Thrown when a channel's customTargetCurvePoints can't be read. */
-export class TargetParseError extends Error {}
-
-const POINT_PATTERN = /^\{\s*([-+0-9.eE]+)\s*,\s*([-+0-9.eE]+)\s*\}$/;
-
 /** The channel's written curve (dB) on the grid; all zeros when it has no custom points. */
 function writtenCurve(channel: AdyChannel): number[] {
   const grid = logGrid();
-  if (channel.customTargetCurvePoints.length === 0) return grid.map(() => 0);
-
-  const points = channel.customTargetCurvePoints.map((raw) => {
-    const match = POINT_PATTERN.exec(String(raw).trim());
-    const freq = match ? Number(match[1]) : NaN;
-    const gain = match ? Number(match[2]) : NaN;
-    if (!Number.isFinite(freq) || !Number.isFinite(gain) || freq <= 0) {
-      throw new TargetParseError(`Channel ${channel.commandId}: cannot read curve point "${String(raw)}"`);
-    }
-    return { freq, gain };
-  });
-  points.sort((a, b) => a.freq - b.freq);
-  const xs = points.map((p) => p.freq);
-  const ys = points.map((p) => p.gain);
-  return grid.map((f) => interpLogFreq(xs, ys, f));
+  const { freqs, gains } = readCurvePoints(channel);
+  if (freqs.length === 0) return grid.map(() => 0);
+  return grid.map((f) => interpLogFreq(freqs, gains, f));
 }
 
 /**

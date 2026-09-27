@@ -1,144 +1,60 @@
 import { describe, it, expect } from 'vitest';
 import {
-  CorrectionValidationError,
   DEFAULT_CUTOFF_HZ,
+  MAX_CUTOFF_HZ,
+  MIN_CUTOFF_HZ,
   buildChannelTrims,
-  createCorrection,
-  parseCorrection,
-  serializeCorrection,
   summarizeCorrection,
   trimFromError,
-  type CorrectionFile,
+  type Correction,
 } from './correction';
 import { logGrid } from './measuredError';
 
-function sample(): CorrectionFile {
-  const error = logGrid().map((_, i) => i * 0.01);
-  return createCorrection({ FL: { positions: 3, error } }, 'test mic', new Date('2026-09-20T12:00:00Z'));
-}
+const freq = logGrid();
+/** 0 up to 1.5 kHz and `v` above: zero around the 1 kHz pin, so above the fade the trim is exactly -v. */
+const shelf = (v: number) => freq.map((f) => (f >= 1500 ? v : 0));
 
-/** parseCorrection on a modified copy of a valid file. */
-function parseWith(mutate: (raw: Record<string, any>) => void): CorrectionFile {
-  const raw = JSON.parse(serializeCorrection(sample()));
-  mutate(raw);
-  return parseCorrection(JSON.stringify(raw));
-}
-
-describe('createCorrection', () => {
-  it('stamps version, label, timestamp and the shared grid', () => {
-    const c = sample();
-    expect(c.version).toBe(1);
-    expect(c.label).toBe('test mic');
-    expect(c.created).toBe('2026-09-20T12:00:00.000Z');
-    expect(c.freq).toEqual(logGrid());
-    expect(c.channels.FL.positions).toBe(3);
-  });
-});
-
-describe('serializeCorrection / parseCorrection', () => {
-  it('round-trips', () => {
-    const c = sample();
-    expect(parseCorrection(serializeCorrection(c))).toEqual(c);
-  });
-
-  it('defaults a missing label to an empty string', () => {
-    expect(parseWith((raw) => delete raw.label).label).toBe('');
-  });
-});
-
-describe('parseCorrection validation', () => {
-  it('rejects text that is not JSON', () => {
-    expect(() => parseCorrection('{nope')).toThrow(CorrectionValidationError);
-  });
-
-  it('rejects a non-object top level', () => {
-    expect(() => parseCorrection('[1,2]')).toThrow(CorrectionValidationError);
-  });
-
-  it('rejects an unsupported version', () => {
-    expect(() => parseWith((raw) => (raw.version = 2))).toThrow(/version/);
-  });
-
-  it('rejects a missing timestamp', () => {
-    expect(() => parseWith((raw) => delete raw.created)).toThrow(/created/);
-  });
-
-  it('rejects a freq array that is not ascending', () => {
-    expect(() => parseWith((raw) => ([raw.freq[3], raw.freq[4]] = [raw.freq[4], raw.freq[3]]))).toThrow(/ascending/);
-  });
-
-  it('rejects a valid-but-different freq grid', () => {
-    expect(() =>
-      parseWith((raw) => {
-        raw.freq = [20, 200, 2000, 20000];
-        raw.channels.FL.error = [0, 0, 0, 0];
-      })
-    ).toThrow(/shared .*-point 20 Hz/);
-  });
-
-  it('rejects non-finite or non-positive frequencies', () => {
-    expect(() => parseWith((raw) => (raw.freq[0] = -5))).toThrow(CorrectionValidationError);
-    expect(() => parseWith((raw) => (raw.freq[2] = 'x'))).toThrow(CorrectionValidationError);
-  });
-
-  it('rejects a channels value that is not an object', () => {
-    expect(() => parseWith((raw) => (raw.channels = []))).toThrow(/channels/);
-  });
-
-  it('rejects an error array of the wrong length, naming the channel', () => {
-    expect(() => parseWith((raw) => raw.channels.FL.error.pop())).toThrow(/FL/);
-  });
-
-  it('rejects non-finite error values', () => {
-    expect(() => parseWith((raw) => (raw.channels.FL.error[5] = null))).toThrow(/FL/);
-  });
-
-  it('rejects a bad positions count', () => {
-    expect(() => parseWith((raw) => (raw.channels.FL.positions = 0))).toThrow(/positions/);
-    expect(() => parseWith((raw) => (raw.channels.FL.positions = 2.5))).toThrow(/positions/);
+describe('cutoff constants', () => {
+  it('defaults to 500 Hz and allows 100-18000 Hz', () => {
+    expect(DEFAULT_CUTOFF_HZ).toBe(500);
+    expect(MIN_CUTOFF_HZ).toBe(100);
+    expect(MAX_CUTOFF_HZ).toBe(18000);
   });
 });
 
 describe('trimFromError', () => {
-  const freq = logGrid();
-  const flat = (v: number) => freq.map(() => v);
-
   it('rejects a cutoff that is not a positive finite number', () => {
     for (const bad of [0, -1, NaN, Infinity]) {
-      expect(() => trimFromError(flat(1), freq, bad)).toThrow(/cutoff/i);
+      expect(() => trimFromError(shelf(1), freq, bad)).toThrow(/cutoff/i);
     }
   });
 
-  it('defaults the cutoff to 2 kHz', () => {
-    expect(DEFAULT_CUTOFF_HZ).toBe(2000);
-  });
-
-  it('is zero below the fade, half at the cutoff and full above it (for a flat error)', () => {
-    const trim = trimFromError(flat(2), freq, 2000);
-    expect(trim(1000)).toBeCloseTo(0, 6);
-    expect(trim(2000)).toBeCloseTo(-1, 1);
-    expect(trim(2900)).toBeCloseTo(-2, 2);
+  it('is zero below the fade, half at the cutoff and full above it', () => {
+    const trim = trimFromError(shelf(2), freq, 4000);
+    expect(trim(2000)).toBeCloseTo(0, 6);
+    expect(trim(4000)).toBeCloseTo(-1, 1);
+    expect(trim(5800)).toBeCloseTo(-2, 2);
     expect(trim(10000)).toBeCloseTo(-2, 6);
     expect(trim(20000)).toBeCloseTo(-2, 6);
   });
 
   it('is the negative of the error (a positive error gives a cut, a negative one a boost)', () => {
-    expect(trimFromError(flat(-2), freq, 2000)(10000)).toBeCloseTo(2, 6);
+    expect(trimFromError(shelf(-2), freq, 4000)(10000)).toBeCloseTo(2, 6);
   });
 
   it('clamps to +/-3 dB', () => {
-    expect(trimFromError(flat(10), freq, 2000)(10000)).toBeCloseTo(-3, 6);
-    expect(trimFromError(flat(-10), freq, 2000)(10000)).toBeCloseTo(3, 6);
+    expect(trimFromError(shelf(10), freq, 4000)(10000)).toBeCloseTo(-3, 6);
+    expect(trimFromError(shelf(-10), freq, 4000)(10000)).toBeCloseTo(3, 6);
   });
 
   it('moves the fade with the cutoff', () => {
-    const trim = trimFromError(flat(2), freq, 4000);
-    expect(trim(2000)).toBeCloseTo(0, 6);
-    expect(trim(8000)).toBeCloseTo(-2, 6);
+    const trim = trimFromError(shelf(2), freq, 8000);
+    expect(trim(4000)).toBeCloseTo(0, 6);
+    expect(trim(16000)).toBeCloseTo(-2, 6);
   });
 
   it('smooths a single-point spike instead of chasing it', () => {
-    const error = flat(0);
+    const error = freq.map(() => 0);
     error[freq.findIndex((f) => f >= 8000)] = 10;
     const trim = trimFromError(error, freq, 2000);
     for (const f of freq) expect(Math.abs(trim(f))).toBeLessThan(0.5);
@@ -155,47 +71,48 @@ describe('trimFromError', () => {
     expect(trim(50000)).toBeCloseTo(trim(20000), 9);
     expect(trim(5)).toBeCloseTo(trim(20), 9);
   });
+
+  it('removes a pure level offset: a flat error gives no correction', () => {
+    const trim = trimFromError(freq.map(() => 2.5), freq, 300);
+    for (const f of freq) expect(Math.abs(trim(f))).toBeLessThan(1e-9);
+  });
+
+  it('lines the correction up at 1 kHz, not at the average level', () => {
+    // 1 dB up to 1.5 kHz and 3 dB above: relative to 1 kHz the treble is 2 dB hot
+    const error = freq.map((f) => (f >= 1500 ? 3 : 1));
+    expect(trimFromError(error, freq, 4000)(10000)).toBeCloseTo(-2, 6);
+  });
+
+  it('pins the correction to 0 at 1 kHz for cutoffs below the octave around it', () => {
+    const sloped = freq.map((f) => Math.log2(f / 200)); // about 2.3 dB at 1 kHz and changing through it
+    for (const cutoff of [100, 300, 500, 700]) {
+      expect(Math.abs(trimFromError(sloped, freq, cutoff)(1000))).toBeLessThan(0.01);
+    }
+  });
 });
 
 describe('buildChannelTrims / summarizeCorrection', () => {
-  const freq = logGrid();
-  const correction: CorrectionFile = createCorrection(
-    {
-      FL: { positions: 3, error: freq.map(() => 2) },
-      FR: { positions: 2, error: freq.map(() => -1) },
-    },
-    '',
-    new Date('2026-09-20T12:00:00Z')
-  );
+  const correction: Correction = {
+    FL: { positions: 3, error: shelf(2) },
+    FR: { positions: 2, error: shelf(-1) },
+  };
 
   it('builds one trim function per channel', () => {
-    const trims = buildChannelTrims(correction, 2000);
+    const trims = buildChannelTrims(correction, 4000);
     expect([...trims.keys()].sort()).toEqual(['FL', 'FR']);
     expect(trims.get('FL')!(10000)).toBeCloseTo(-2, 6);
     expect(trims.get('FR')!(10000)).toBeCloseTo(1, 6);
   });
 
   it('summarises positions and the largest trim per channel', () => {
-    const rows = summarizeCorrection(correction, 2000, ['FL', 'FR', 'C']);
-    const fl = rows.find((r) => r.commandId === 'FL')!;
+    const fl = summarizeCorrection(correction, 4000).find((r) => r.commandId === 'FL')!;
     expect(fl.positions).toBe(3);
     expect(fl.maxAbsTrim).toBeCloseTo(2, 6);
-    expect(fl.inBase).toBe(true);
-  });
-
-  it('flags channels the base file does not have', () => {
-    const rows = summarizeCorrection(correction, 2000, ['FL', 'C']);
-    expect(rows.find((r) => r.commandId === 'FR')!.inBase).toBe(false);
-  });
-
-  it('treats every channel as present when no base file is loaded yet', () => {
-    const rows = summarizeCorrection(correction, 2000, []);
-    expect(rows.every((r) => r.inBase)).toBe(true);
   });
 
   it('reports a smaller largest trim for a higher cutoff', () => {
-    const low = summarizeCorrection(correction, 2000, [])[0].maxAbsTrim;
-    const none = summarizeCorrection(correction, 60000, [])[0].maxAbsTrim;
+    const low = summarizeCorrection(correction, 4000)[0].maxAbsTrim;
+    const none = summarizeCorrection(correction, 60000)[0].maxAbsTrim;
     expect(low).toBeGreaterThan(none);
   });
 });
