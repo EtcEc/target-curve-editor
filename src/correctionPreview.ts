@@ -1,5 +1,5 @@
 import type { AdyChannel } from './ady';
-import { trimFromError, type ChannelCorrection } from './correction';
+import { trimFromError, type ChannelCorrection, type TrimOptions, DEFAULT_TRIM_OPTIONS } from './correction';
 import { effectiveTarget, logGrid } from './measuredError';
 import type { RolloffType } from './rolloff';
 
@@ -18,11 +18,12 @@ export function previewCurves(
   channel: AdyChannel,
   rolloffType: RolloffType,
   correction: ChannelCorrection,
-  cutoffHz: number
+  cutoffHz: number,
+  options: TrimOptions = DEFAULT_TRIM_OPTIONS
 ): PreviewCurves {
   const freq = logGrid();
   const current = effectiveTarget(channel, rolloffType);
-  const trim = trimFromError(correction.error, freq, cutoffHz);
+  const trim = trimFromError(correction.error, freq, cutoffHz, options);
   return {
     freq,
     current,

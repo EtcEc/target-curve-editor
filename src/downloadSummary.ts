@@ -1,5 +1,6 @@
 import type { Band } from './bands';
 import type { CurveParams } from './curve';
+import { DEFAULT_TRIM_OPTIONS, formatOctaves, type TrimOptions } from './correction';
 
 /** Number without trailing zeros, at most 2 decimals. */
 function num(value: number): string {
@@ -60,12 +61,20 @@ export function buildFilenameSuffix(params: CurveParams): string {
 }
 
 /** What the Correct page's download will contain. */
-export function correctChecklist(channels: readonly string[], cutoffHz: number): ChecklistItem[] {
+export function correctChecklist(
+  channels: readonly string[],
+  cutoffHz: number,
+  options: TrimOptions = DEFAULT_TRIM_OPTIONS
+): ChecklistItem[] {
   const lo = Math.round(cutoffHz / Math.SQRT2);
   const hi = Math.round(cutoffHz * Math.SQRT2);
   return [
     {
       text: `Measured correction on ${channels.join(', ')}, fading in from ${lo} Hz to ${hi} Hz (cutoff ${cutoffHz} Hz)`,
+      on: true,
+    },
+    {
+      text: `Detail ${formatOctaves(options.detailOctaves)} oct · strength ${Math.round(options.strength * 100)}% · limit ±${options.limitDb} dB`,
       on: true,
     },
     { text: 'Unchanged below the fade; each curve keeps its level at 1 kHz', on: true },

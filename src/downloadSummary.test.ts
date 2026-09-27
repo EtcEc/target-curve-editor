@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildFilenameSuffix, designChecklist, correctChecklist, measuredFilename } from './downloadSummary';
 import { testParams } from './fixtures/testParams';
+import { DEFAULT_TRIM_OPTIONS } from './correction';
 
 const DEFAULT_CURVE = '0.7 dB/oct tilt (held below 50 Hz), +1.43 dB low shelf at 66.5 Hz';
 
@@ -71,12 +72,18 @@ describe('buildFilenameSuffix', () => {
 });
 
 describe('correctChecklist', () => {
-  it('names the corrected channels and the cutoff, and says what stays the same', () => {
+  it('names the corrected channels, the fade and the settings, and says what stays the same', () => {
     expect(correctChecklist(['FL', 'FR', 'C'], 500)).toEqual([
       { text: 'Measured correction on FL, FR, C, fading in from 354 Hz to 707 Hz (cutoff 500 Hz)', on: true },
+      { text: 'Detail 1 oct · strength 100% · limit ±3 dB', on: true },
       { text: 'Unchanged below the fade; each curve keeps its level at 1 kHz', on: true },
       { text: 'Sub, channel levels and HF rolloff unchanged', on: true },
     ]);
+  });
+
+  it('shows non-default settings', () => {
+    const options = { ...DEFAULT_TRIM_OPTIONS, detailOctaves: 1 / 3, strength: 0.7, limitDb: 4.5 };
+    expect(correctChecklist(['FL'], 500, options)[1].text).toBe('Detail ⅓ oct · strength 70% · limit ±4.5 dB');
   });
 });
 

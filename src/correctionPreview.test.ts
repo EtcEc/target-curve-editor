@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { trimFromError } from './correction';
+import { trimFromError, DEFAULT_TRIM_OPTIONS } from './correction';
 import { previewCurves } from './correctionPreview';
 import { effectiveTarget, logGrid } from './measuredError';
 import { createSampleAdy } from './fixtures/sampleAdy';
@@ -27,5 +27,12 @@ describe('previewCurves', () => {
     const curves = previewCurves(channel(), 2, { positions: 1, error }, 4000);
     const i = grid.findIndex((f) => f >= 1000);
     expect(curves.corrected[i]).toBeCloseTo(curves.current[i], 9);
+  });
+
+  it('uses the trim options for the corrected line', () => {
+    const options = { ...DEFAULT_TRIM_OPTIONS, strength: 0.5, limitDb: 0.5 };
+    const curves = previewCurves(channel(), 2, { positions: 1, error }, 500, options);
+    const trim = trimFromError(error, grid, 500, options);
+    curves.corrected.forEach((v, i) => expect(v).toBeCloseTo(curves.current[i] + trim(grid[i]), 9));
   });
 });
