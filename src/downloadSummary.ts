@@ -58,3 +58,18 @@ export function designChecklist(
 export function buildFilenameSuffix(params: CurveParams): string {
   return (params.cancelRolloff ? '' : '_no-knee-cancel') + (params.subTrim ? '' : '_no-sub-trim');
 }
+
+/** What the Correct page's download will contain. */
+export function correctChecklist(channels: readonly string[], cutoffHz: number): ChecklistItem[] {
+  return [
+    { text: `Measured correction on ${channels.join(', ')} above ${cutoffHz} Hz`, on: true },
+    { text: 'Curves unchanged at 1 kHz and below the cutoff', on: true },
+    { text: 'Sub, channel levels and HF rolloff unchanged', on: true },
+  ];
+}
+
+/** Download name for a corrected file, e.g. "Living_measured-500Hz.ady". */
+export function measuredFilename(title: unknown, cutoffHz: number): string {
+  const name = `measured-${Math.round(cutoffHz)}Hz.ady`;
+  return typeof title === 'string' && title.length > 0 ? `${title}_${name}` : name;
+}

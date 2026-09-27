@@ -1,4 +1,6 @@
-import { frequencyGrid, writtenGain, computeTrimShift, type CurveParams } from './curve';
+import { frequencyGrid, writtenGain, computeTrimShift, type CurveParams, type TrimFn } from './curve';
+import { readCurvePoints } from './curvePoints';
+import { interpLogFreq } from './logInterp';
 
 export interface AdyChannel {
   commandId: string;
@@ -65,7 +67,9 @@ export function isSubwooferChannel(channel: AdyChannel): boolean {
 }
 
 function formatPoint(freq: number, gain: number): string {
-  return `{${freq.toFixed(1)}, ${gain.toFixed(3)}}`;
+  const text = gain.toFixed(3);
+  // a value that rounds to zero from below would print "-0.000"; write it as "0.000"
+  return `{${freq.toFixed(1)}, ${text === '-0.000' ? '0.000' : text}}`;
 }
 
 /**
@@ -88,6 +92,34 @@ export function applyCurveToAdy(ady: AdyFile, params: CurveParams): AdyFile {
   }
 
   clone.enTargetCurveType = params.rolloffType;
+  return clone;
+}
+
+export class MeasuredCorrectionError extends Error {}
+
+/**
+ * Returns a new AdyFile with a measured correction added to the curves already
+ * in the file. Each non-sub channel that has a trim gets its existing curve,
+ * resampled onto the write grid (log-frequency interpolation), plus the trim.
+ * Everything else — other channels' points, every trimAdjustment,
+ * enTargetCurveType, all other fields — is copied as is. Does not mutate the
+ * input. Throws MeasuredCorrectionError for a trimmed channel with no curve.
+ */
+export function applyMeasuredCorrection(ady: AdyFile, trims: ReadonlyMap<string, TrimFn>): AdyFile {
+  const clone = JSON.parse(JSON.stringify(ady)) as AdyFile;
+  const grid = frequencyGrid();
+  for (const channel of clone.detectedChannels) {
+    if (isSubwooferChannel(channel)) continue;
+    const trim = trims.get(channel.commandId);
+    if (!trim) continue;
+    const { freqs, gains } = readCurvePoints(channel);
+    if (freqs.length === 0) {
+      throw new MeasuredCorrectionError(
+        `Channel ${channel.commandId} has no target curve. Design one on the Design page first.`
+      );
+    }
+    channel.customTargetCurvePoints = grid.map((f) => formatPoint(f, interpLogFreq(freqs, gains, f) + trim(f)));
+  }
   return clone;
 }
 

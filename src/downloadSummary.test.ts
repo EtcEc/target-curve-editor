@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildFilenameSuffix, designChecklist } from './downloadSummary';
+import { buildFilenameSuffix, designChecklist, correctChecklist, measuredFilename } from './downloadSummary';
 import { testParams } from './fixtures/testParams';
 
 const DEFAULT_CURVE = '0.7 dB/oct tilt (held below 50 Hz), +1.43 dB low shelf at 66.5 Hz';
@@ -67,5 +67,27 @@ describe('buildFilenameSuffix', () => {
 
   it('adds only what applies', () => {
     expect(buildFilenameSuffix(testParams({ subTrim: false }))).toBe('_no-sub-trim');
+  });
+});
+
+describe('correctChecklist', () => {
+  it('names the corrected channels and the cutoff, and says what stays the same', () => {
+    expect(correctChecklist(['FL', 'FR', 'C'], 500)).toEqual([
+      { text: 'Measured correction on FL, FR, C above 500 Hz', on: true },
+      { text: 'Curves unchanged at 1 kHz and below the cutoff', on: true },
+      { text: 'Sub, channel levels and HF rolloff unchanged', on: true },
+    ]);
+  });
+});
+
+describe('measuredFilename', () => {
+  it('uses the title and the rounded cutoff', () => {
+    expect(measuredFilename('Living', 500)).toBe('Living_measured-500Hz.ady');
+    expect(measuredFilename('Living', 312.4)).toBe('Living_measured-312Hz.ady');
+  });
+
+  it('works without a title', () => {
+    expect(measuredFilename(undefined, 500)).toBe('measured-500Hz.ady');
+    expect(measuredFilename('', 500)).toBe('measured-500Hz.ady');
   });
 });
