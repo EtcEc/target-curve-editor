@@ -1,35 +1,38 @@
 import { describe, expect, it } from 'vitest';
-import { buildDownloadSummary, buildFilenameSuffix } from './downloadSummary';
+import { buildFilenameSuffix, designChecklist } from './downloadSummary';
 import { testParams } from './fixtures/testParams';
 
 const DEFAULT_CURVE = '0.7 dB/oct tilt (held below 50 Hz), +1.43 dB low shelf at 66.5 Hz';
 
-describe('buildDownloadSummary', () => {
-  it('describes the default design with no correction and everything applied', () => {
-    expect(buildDownloadSummary(testParams(), [], 2000)).toBe(
-      `Contains: ${DEFAULT_CURVE}; no measured correction; sub trim applied; HF rolloff 2 cancelled.`
-    );
+describe('designChecklist', () => {
+  it('lists the curve, the cancelled rolloff and the sub trim for the default design', () => {
+    expect(designChecklist(testParams(), ['SW1'], 6.27)).toEqual([
+      { text: `Curve: ${DEFAULT_CURVE}`, on: true },
+      { text: 'HF rolloff 2 cancelled', on: true },
+      { text: 'Sub trim +6.27 dB on SW1', on: true },
+    ]);
   });
 
-  it('lists only the channels that get a trim, with the cutoff', () => {
-    expect(buildDownloadSummary(testParams(), ['FL', 'FR', 'C'], 2000)).toContain(
-      'measured trim on FL, FR, C above 2000 Hz'
-    );
+  it('marks a rolloff that is left on', () => {
+    expect(designChecklist(testParams({ rolloffType: 1, cancelRolloff: false }), ['SW1'], 0)[1]).toEqual({
+      text: 'HF rolloff 1 left on',
+      on: false,
+    });
   });
 
-  it('says no measured correction when apply is unticked or the cutoff is null', () => {
-    expect(buildDownloadSummary(testParams(), [], null)).toContain('no measured correction');
-    expect(buildDownloadSummary(testParams(), ['FL'], null)).toContain('no measured correction');
+  it('marks a skipped sub trim', () => {
+    expect(designChecklist(testParams({ subTrim: false }), ['SW1'], 6.27)[2]).toEqual({
+      text: 'Sub trim skipped',
+      on: false,
+    });
   });
 
-  it('states when the sub trim is skipped', () => {
-    expect(buildDownloadSummary(testParams({ subTrim: false }), [], null)).toContain('sub trim skipped');
+  it('says when there is no subwoofer', () => {
+    expect(designChecklist(testParams(), [], 6.27)[2]).toEqual({ text: 'No subwoofer, so no sub trim', on: false });
   });
 
-  it('states the rolloff type and whether it is cancelled', () => {
-    expect(buildDownloadSummary(testParams({ rolloffType: 1, cancelRolloff: false }), [], null)).toContain(
-      'HF rolloff 1 not cancelled'
-    );
+  it('names every sub', () => {
+    expect(designChecklist(testParams(), ['SW1', 'SW2'], 1.5)[2].text).toBe('Sub trim +1.5 dB on SW1, SW2');
   });
 
   it('describes every band type and skips disabled bands', () => {
@@ -41,29 +44,28 @@ describe('buildDownloadSummary', () => {
         { type: 'lowShelf', enabled: false, gain: 5, freq: 60, q: 0.707 },
       ],
     });
-    expect(buildDownloadSummary(params, [], null)).toContain(
-      'Contains: 1 dB/oct tilt, -2 dB high shelf at 8000 Hz, -3 dB bell at 3000 Hz (Q 1.4);'
+    expect(designChecklist(params, ['SW1'], 0)[0].text).toBe(
+      'Curve: 1 dB/oct tilt, -2 dB high shelf at 8000 Hz, -3 dB bell at 3000 Hz (Q 1.4)'
     );
   });
 
   it('says flat when there are no enabled bands', () => {
-    expect(buildDownloadSummary(testParams({ bands: [] }), [], null)).toContain('Contains: flat curve;');
+    expect(designChecklist(testParams({ bands: [] }), ['SW1'], 0)[0].text).toBe('Curve: flat');
   });
 });
 
 describe('buildFilenameSuffix', () => {
-  it('is empty for the default settings without trims', () => {
-    expect(buildFilenameSuffix(testParams(), false)).toBe('');
+  it('is empty for the default settings', () => {
+    expect(buildFilenameSuffix(testParams())).toBe('');
   });
 
-  it('orders the suffixes no-knee-cancel, no-sub-trim, measured-trim', () => {
-    expect(buildFilenameSuffix(testParams({ cancelRolloff: false, subTrim: false }), true)).toBe(
-      '_no-knee-cancel_no-sub-trim_measured-trim'
+  it('orders the suffixes no-knee-cancel, no-sub-trim', () => {
+    expect(buildFilenameSuffix(testParams({ cancelRolloff: false, subTrim: false }))).toBe(
+      '_no-knee-cancel_no-sub-trim'
     );
   });
 
   it('adds only what applies', () => {
-    expect(buildFilenameSuffix(testParams({ subTrim: false }), false)).toBe('_no-sub-trim');
-    expect(buildFilenameSuffix(testParams(), true)).toBe('_measured-trim');
+    expect(buildFilenameSuffix(testParams({ subTrim: false }))).toBe('_no-sub-trim');
   });
 });

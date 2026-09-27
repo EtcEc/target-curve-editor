@@ -2,7 +2,6 @@ import {
   parseAdy,
   isSubwooferChannel,
   applyCurveToAdy,
-  hasAppliedTrims,
   looksAlreadyProcessed,
   serializeAdy,
   AdyValidationError,
@@ -11,13 +10,13 @@ import {
 import { initBandsUi } from './bandsUi';
 import { sumBands, validateBands, type Band } from './bands';
 import { createChart, slotCurveData, updateChart } from './chart';
-import { initCorrectionUi } from './correctionUi';
 import { initDesignUi } from './designUi';
-import { buildDownloadSummary, buildFilenameSuffix } from './downloadSummary';
+import { buildFilenameSuffix, designChecklist } from './downloadSummary';
 import { computeTrimShift, subTrimPeakAboveSub, type CurveParams } from './curve';
 import { DEFAULT_PRESET_NAME, presetBands } from './presets';
 import { isRolloffType } from './rolloff';
 import { SLOT_IDS, createSlots } from './slots';
+import { renderChecklist } from './ui/checklist';
 
 let currentAdy: AdyFile | null = null;
 let chart: ReturnType<typeof createChart> | null = null;
@@ -40,14 +39,12 @@ const rolloffNotice = document.getElementById('rolloff-notice') as HTMLElement;
 const subTrimInput = document.getElementById('sub-trim') as HTMLInputElement;
 const subTrimNotice = document.getElementById('sub-trim-notice') as HTMLElement;
 const subTrimPeak = document.getElementById('sub-trim-peak') as HTMLElement;
-const channelSummaryBody = document.querySelector('#channel-summary tbody') as HTMLElement;
 const noSubwooferWarning = document.getElementById('no-subwoofer-warning') as HTMLElement;
 const downloadSection = document.getElementById('download-section') as HTMLElement;
 const downloadSummary = document.getElementById('download-summary') as HTMLElement;
 const editorPlaceholder = document.getElementById('editor-placeholder') as HTMLElement;
 const downloadPlaceholder = document.getElementById('download-placeholder') as HTMLElement;
 const downloadButton = document.getElementById('download') as HTMLButtonElement;
-const correctionUi = initCorrectionUi(() => onParamsChanged());
 const bandError = document.getElementById('band-error') as HTMLElement;
 const bandLevel = document.getElementById('band-level') as HTMLElement;
 const bandsUi = initBandsUi(params, () => onParamsChanged());
@@ -110,7 +107,6 @@ function loadFile(file: File): void {
     try {
       currentAdy = parseAdy(text);
       applyFileDefaults(currentAdy);
-      correctionUi.setBaseChannels(currentAdy.detectedChannels.map((c) => c.commandId));
       clearError();
       editor.hidden = false;
       downloadSection.hidden = false;
@@ -141,43 +137,11 @@ function loadFile(file: File): void {
   reader.readAsText(file);
 }
 
-function renderChannelSummary(): void {
-  if (!currentAdy) return;
-  channelSummaryBody.innerHTML = '';
-  const valid = validateBands(params.bands) === null;
-  const trimShift = valid ? computeTrimShift(params) : 0;
-  let anySubwoofer = false;
-
-  for (const channel of currentAdy.detectedChannels) {
-    const isSub = isSubwooferChannel(channel);
-    if (isSub) anySubwoofer = true;
-    const row = document.createElement('tr');
-
-    const nameCell = document.createElement('td');
-    nameCell.textContent = channel.commandId;
-    row.appendChild(nameCell);
-
-    const roleCell = document.createElement('td');
-    roleCell.textContent = isSub ? 'Subwoofer' : 'Speaker';
-    row.appendChild(roleCell);
-
-    const trimCell = document.createElement('td');
-    trimCell.textContent = isSub && valid ? (params.subTrim ? trimShift.toFixed(2) : 'skipped') : '—';
-    row.appendChild(trimCell);
-
-    channelSummaryBody.appendChild(row);
-  }
-
-  noSubwooferWarning.hidden = anySubwoofer;
-}
-
 function renderDownloadSummary(): void {
   if (!currentAdy) return;
-  const trims = correctionUi.getTrims();
-  const trimmed = currentAdy.detectedChannels
-    .filter((c) => !isSubwooferChannel(c) && trims?.has(c.commandId))
-    .map((c) => c.commandId);
-  downloadSummary.textContent = buildDownloadSummary(params, trimmed, correctionUi.getCutoffHz());
+  const subIds = currentAdy.detectedChannels.filter(isSubwooferChannel).map((c) => c.commandId);
+  renderChecklist(downloadSummary, designChecklist(params, subIds, computeTrimShift(params)));
+  noSubwooferWarning.hidden = subIds.length > 0;
 }
 
 /** Explains a sub trim that comes from a peak above the sub's range (e.g. the boost that cancels the HF rolloff). */
@@ -199,18 +163,16 @@ function onParamsChanged(): void {
     chart?.redraw(false, false);
     bandLevel.textContent = '';
     subTrimPeak.hidden = true;
-    downloadSummary.textContent = 'Fix the band values above to see what the download will contain.';
-    renderChannelSummary();
+    renderChecklist(downloadSummary, [
+      { text: 'Fix the band values above to see what the download will contain.', on: false },
+    ]);
     return;
   }
   designUi.clearError(); // a "fix the band values" message from saving no longer applies
   renderSubTrimPeak();
   bandLevel.textContent = `Level at 20 Hz: ${sumBands(20, params.bands).toFixed(2)} dB`;
   if (chart) updateChart(chart, params, SLOT_IDS.map((id) => slotCurveData(slots.get(id), params)));
-  if (currentAdy) {
-    renderChannelSummary();
-    renderDownloadSummary();
-  }
+  renderDownloadSummary();
 }
 
 fileInput.addEventListener('change', () => {
@@ -249,20 +211,17 @@ subTrimInput.addEventListener('change', () => {
 downloadButton.addEventListener('click', () => {
   if (!currentAdy) return;
   if (validateBands(params.bands) !== null) return;
-  const trims = correctionUi.getTrims();
-  const result = applyCurveToAdy(currentAdy, params, trims);
-  const text = serializeAdy(result);
-  const blob = new Blob([text], { type: 'application/json' });
+  const result = applyCurveToAdy(currentAdy, params);
+  const blob = new Blob([serializeAdy(result)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   // distinct names so test variants can't be mistaken for the normal file
-  const suffix = buildFilenameSuffix(params, hasAppliedTrims(currentAdy, trims));
-  const filename =
+  const suffix = buildFilenameSuffix(params);
+  a.href = url;
+  a.download =
     typeof result.title === 'string' && result.title.length > 0
       ? `${result.title}_corrected${suffix}.ady`
       : `corrected${suffix}.ady`;
-  a.href = url;
-  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
 });

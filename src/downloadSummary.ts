@@ -28,31 +28,33 @@ function describeBand(band: Band): string {
   }
 }
 
-/**
- * One-line description of what the downloaded .ady will contain.
- * `trimmedChannels` must only list channels that actually get a measured trim.
- */
-export function buildDownloadSummary(
+/** One line of a download checklist; `on: false` lines are shown as "not applied". */
+export interface ChecklistItem {
+  text: string;
+  on: boolean;
+}
+
+/** What the Design page's download will contain, one fact per line. */
+export function designChecklist(
   params: CurveParams,
-  trimmedChannels: readonly string[],
-  cutoffHz: number | null
-): string {
+  subIds: readonly string[],
+  subTrimShift: number
+): ChecklistItem[] {
   const enabled = params.bands.filter((b) => b.enabled);
-  const curve = enabled.length > 0 ? enabled.map(describeBand).join(', ') : 'flat curve';
-  const trim =
-    trimmedChannels.length > 0 && cutoffHz !== null
-      ? `measured trim on ${trimmedChannels.join(', ')} above ${cutoffHz} Hz`
-      : 'no measured correction';
-  const sub = params.subTrim ? 'sub trim applied' : 'sub trim skipped';
-  const rolloff = `HF rolloff ${params.rolloffType} ${params.cancelRolloff ? 'cancelled' : 'not cancelled'}`;
-  return `Contains: ${[curve, trim, sub, rolloff].join('; ')}.`;
+  const curve = enabled.length > 0 ? enabled.map(describeBand).join(', ') : 'flat';
+  const items: ChecklistItem[] = [{ text: `Curve: ${curve}`, on: true }];
+  items.push(
+    params.cancelRolloff
+      ? { text: `HF rolloff ${params.rolloffType} cancelled`, on: true }
+      : { text: `HF rolloff ${params.rolloffType} left on`, on: false }
+  );
+  if (subIds.length === 0) items.push({ text: 'No subwoofer, so no sub trim', on: false });
+  else if (params.subTrim) items.push({ text: `Sub trim ${signed(subTrimShift)} dB on ${subIds.join(', ')}`, on: true });
+  else items.push({ text: 'Sub trim skipped', on: false });
+  return items;
 }
 
 /** Filename suffix that tells test variants apart from the normal export. */
-export function buildFilenameSuffix(params: CurveParams, hasTrims: boolean): string {
-  return (
-    (params.cancelRolloff ? '' : '_no-knee-cancel') +
-    (params.subTrim ? '' : '_no-sub-trim') +
-    (hasTrims ? '_measured-trim' : '')
-  );
+export function buildFilenameSuffix(params: CurveParams): string {
+  return (params.cancelRolloff ? '' : '_no-knee-cancel') + (params.subTrim ? '' : '_no-sub-trim');
 }

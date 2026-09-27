@@ -1,4 +1,4 @@
-import { frequencyGrid, writtenGain, computeTrimShift, type CurveParams, type TrimFn } from './curve';
+import { frequencyGrid, writtenGain, computeTrimShift, type CurveParams } from './curve';
 
 export interface AdyChannel {
   commandId: string;
@@ -72,25 +72,15 @@ function formatPoint(freq: number, gain: number): string {
  * Returns a new AdyFile with the designed curve written to every channel and
  * enTargetCurveType set to the selected HF rolloff type. When params.subTrim
  * is on, subwoofer trim is compensated; when off, the sub's trimAdjustment is
- * left exactly as it was. Non-subwoofer channels that have an entry in
- * `trims` get that per-channel trim added on top of the shared curve.
- * Does not mutate the input.
+ * left exactly as it was. Does not mutate the input.
  */
-export function applyCurveToAdy(
-  ady: AdyFile,
-  params: CurveParams,
-  trims?: ReadonlyMap<string, TrimFn>
-): AdyFile {
+export function applyCurveToAdy(ady: AdyFile, params: CurveParams): AdyFile {
   const clone = JSON.parse(JSON.stringify(ady)) as AdyFile;
-  const grid = frequencyGrid();
-  const sharedPoints = grid.map((f) => formatPoint(f, writtenGain(f, params)));
+  const sharedPoints = frequencyGrid().map((f) => formatPoint(f, writtenGain(f, params)));
   const trimShift = computeTrimShift(params);
 
   for (const channel of clone.detectedChannels) {
-    const trim = isSubwooferChannel(channel) ? undefined : trims?.get(channel.commandId);
-    channel.customTargetCurvePoints = trim
-      ? grid.map((f) => formatPoint(f, writtenGain(f, params) + trim(f)))
-      : sharedPoints;
+    channel.customTargetCurvePoints = sharedPoints;
     if (isSubwooferChannel(channel) && params.subTrim) {
       const originalTrim = parseFloat(channel.trimAdjustment);
       channel.trimAdjustment = (originalTrim + trimShift).toFixed(6);
@@ -99,12 +89,6 @@ export function applyCurveToAdy(
 
   clone.enTargetCurveType = params.rolloffType;
   return clone;
-}
-
-/** True when at least one non-subwoofer channel of `ady` has an entry in `trims`. */
-export function hasAppliedTrims(ady: AdyFile, trims: ReadonlyMap<string, TrimFn> | undefined): boolean {
-  if (!trims) return false;
-  return ady.detectedChannels.some((c) => !isSubwooferChannel(c) && trims.has(c.commandId));
 }
 
 const POINT_FREQUENCY = /^\{\s*([0-9.]+)\s*,/;

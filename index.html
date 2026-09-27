@@ -91,102 +91,18 @@
           <div id="slot-list"></div>
         </div>
 
-        <table id="channel-summary">
-          <thead>
-            <tr>
-              <th>Channel</th>
-              <th>Role</th>
-              <th>Trim shift (dB)</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-        <p id="no-subwoofer-warning" class="warning" hidden>
-          No subwoofer channel detected — trim compensation was skipped.
-        </p>
       </section>
 
-      <section id="measured-correction" class="step">
-        <h2 class="step-heading"><span class="step-num">3</span> Measured correction <span class="optional">(optional)</span></h2>
-        <p class="hint">
-          Trims each speaker toward its measured response above the cutoff. Applied on top of the curve from step 2.
-        </p>
-        <h3>Apply a correction file</h3>
-        <input type="file" id="correction-file-input" accept=".json,application/json" />
-        <p id="correction-error" class="error" hidden></p>
-
-        <div id="correction-loaded" hidden>
-          <p id="correction-info"></p>
-          <label>
-            <input type="checkbox" id="correction-enabled" checked />
-            Apply correction
-          </label>
-          <label>
-            Cutoff (Hz)
-            <input type="number" id="correction-cutoff" min="200" max="18000" step="100" value="2000" />
-          </label>
-          <h4 class="table-heading">Trim per speaker</h4>
-          <table id="correction-summary">
-            <thead>
-              <tr>
-                <th>Channel</th>
-                <th>Positions</th>
-                <th>Largest trim (dB)</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-          <p id="correction-notice" class="warning" hidden></p>
-          <p id="generate-warnings" class="warning" hidden></p>
-          <h4 id="generate-report-heading" class="table-heading" hidden>Just generated: error per speaker</h4>
-          <table id="generate-report" hidden>
-            <thead>
-              <tr>
-                <th>Channel</th>
-                <th>Positions</th>
-                <th>Error RMS 2-20 kHz (dB)</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-
-        <button id="generate-open" type="button">Create a correction from measurements…</button>
-      </section>
-
-      <p id="download-placeholder" class="placeholder">4. Download — available once a .ady is loaded.</p>
+      <p id="download-placeholder" class="placeholder">3. Download — available once a .ady is loaded.</p>
       <section id="download-section" class="step" hidden>
-        <h2 class="step-heading"><span class="step-num">4</span> Download</h2>
-        <p id="download-summary" class="summary"></p>
-        <button id="download">Download corrected .ady</button>
+        <h2 class="step-heading"><span class="step-num">3</span> Download</h2>
+        <ul id="download-summary" class="checklist"></ul>
+        <p id="no-subwoofer-warning" class="warning" hidden>
+          No subwoofer channel detected, so there is no sub trim to compensate.
+        </p>
+        <button id="download">Download .ady</button>
       </section>
     </div>
-    <dialog id="generate-dialog">
-      <div class="dialog-header">
-        <h2>Create a correction from measurements</h2>
-        <button id="generate-close" type="button" aria-label="Close">Close</button>
-      </div>
-      <p class="hint">
-        This works without step 1: the correction describes your speakers, not any target curve. Pick the .ady
-        whose filters were loaded on the AVR when you took the REW sweeps. It tells the tool what each speaker
-        was aiming for, including which HF rolloff it used.
-      </p>
-      <p class="hint">
-        Then add the REW text exports for each speaker (about 3 positions each is plenty) and generate.
-      </p>
-      <label>
-        The .ady loaded on the AVR for these sweeps
-        <input type="file" id="measured-ady-input" accept=".ady" />
-      </label>
-      <p id="measured-type-note" class="hint" hidden></p>
-      <p id="generate-error" class="error" hidden></p>
-      <div id="generate-rows"></div>
-      <label>
-        Label (optional)
-        <input type="text" id="generate-label" placeholder="e.g. which mic" />
-      </label>
-      <button id="generate-button" disabled>Generate and download correction.json</button>
-    </dialog>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

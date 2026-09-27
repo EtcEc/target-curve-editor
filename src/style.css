@@ -331,3 +331,21 @@ button {
   font-size: 0.95rem;
   color: #ccc;
 }
+
+.checklist {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+
+.checklist li::before {
+  content: '✓';
+  display: inline-block;
+  width: 1.4rem;
+  font-weight: 700;
+}
+
+.checklist li.off::before {
+  content: '—';
+  color: #aaa;
+}
