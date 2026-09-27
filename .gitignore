@@ -1,6 +1,9 @@
 __pycache__/
 *.pyc
 
+# scratch state for superpowers skills (progress ledgers, brainstorm mockups)
+.superpowers/
+
 # personal calibration files — real room measurement data, keep out of the public repo
 *.ady
 correction*.json
