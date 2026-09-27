@@ -29,11 +29,11 @@ describe('presets', () => {
   it('ships Flat, the default preset and the two literature presets, in that order', () => {
     expect(PRESETS.map((p) => p.name)).toEqual([
       'Flat',
-      'Current (approximated)',
+      'Default',
       'Harman (approximate)',
       'Toole (approximate)',
     ]);
-    expect(DEFAULT_PRESET_NAME).toBe('Current (approximated)');
+    expect(DEFAULT_PRESET_NAME).toBe('Default');
   });
 
   it('Flat is 0 dB everywhere', () => {

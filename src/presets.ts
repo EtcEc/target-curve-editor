@@ -6,7 +6,7 @@ export interface Preset {
   bands: Band[];
 }
 
-export const DEFAULT_PRESET_NAME = 'Current (approximated)';
+export const DEFAULT_PRESET_NAME = 'Default';
 
 /** Both literature presets below are fitted from CSVs posted in this ASR forum thread. */
 const ASR_TARGETS_THREAD =
@@ -21,8 +21,8 @@ export const PRESETS: readonly Preset[] = [
   {
     name: DEFAULT_PRESET_NAME,
     description:
-      'The setup this tool used before bands existed (0.7 dB/oct tilt, 4.5 dB bass shelf), ' +
-      'expressed with standard filters. Within 0.075 dB of the original shape.',
+      'A 0.7 dB/oct tilt through 1 kHz with a bass shelf that levels off at +4.5 dB below about 50 Hz. ' +
+      'The page starts with this curve.',
     bands: [
       { type: 'tilt', enabled: true, slope: 0.7, pivot: 1000, fLow: 50, fHigh: 20000 },
       { type: 'lowShelf', enabled: true, gain: 1.43, freq: 66.5, q: 0.9 },

@@ -211,3 +211,5 @@ Built on 2026-09-26 (plan: `docs/superpowers/plans/2026-09-26-phase-2.md`).
   unavailable — using them as a room target would double-count what a listener's
   own ears and room already add. No B&K curve was found; that preset stays
   unshipped unless one turns up.
+
+Later change (2026-09-27): the "Current (approximated)" preset was renamed "Default"; its bands are unchanged.

@@ -2,7 +2,7 @@ import type { Band } from '../bands';
 import type { CurveParams } from '../curve';
 import { DEFAULT_PRESET_NAME, presetBands } from '../presets';
 
-/** Default design (the "Current (approximated)" preset), Roll Off 2, cancel on, sub trim on. */
+/** Default design (the "Default" preset), Roll Off 2, cancel on, sub trim on. */
 export function testParams(overrides: Partial<CurveParams> = {}): CurveParams {
   return {
     bands: presetBands(DEFAULT_PRESET_NAME),
