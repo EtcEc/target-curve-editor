@@ -7,6 +7,7 @@ const read = (path: string) => readFileSync(new URL(path, root), 'utf8');
 /** Each page and the scripts that look up elements on it. */
 const PAGES: Record<string, string[]> = {
   'design.html': ['src/design/main.ts', 'src/bandsUi.ts', 'src/designUi.ts'],
+  'correct.html': ['src/correct/main.ts'],
 };
 
 const LOOKUPS = [

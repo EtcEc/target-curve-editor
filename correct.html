@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Apply a Measured Correction · Audyssey Target Curve Editor</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="site-header">
+        <h1><a href="./index.html">Audyssey Target Curve Editor</a></h1>
+        <nav><a href="./design.html">Design a curve</a> · <span class="nav-current">Apply a measured correction</span></nav>
+      </header>
+
+      <section class="card">
+        <h2 class="step-title"><span class="step-num">1</span> Load your .ady</h2>
+        <p class="hint">
+          The .ady this tool made, as loaded on the AVR when you took the REW sweeps. Its curves are what the
+          measurements are compared with, and it is the file the download edits.
+        </p>
+        <div id="dropzone" class="dropzone">
+          <p>Drop a .ady file here, or</p>
+          <label class="file-pick">
+            <input type="file" id="file-input" accept=".ady" class="visually-hidden" />
+            <span class="button">Choose .ady…</span>
+            <span class="file-name" data-for="file-input">No file chosen</span>
+          </label>
+        </div>
+        <p id="error-message" class="error" hidden></p>
+        <p id="file-info" class="hint" hidden></p>
+      </section>
+
+      <p id="measure-placeholder" class="placeholder">2 · Add measurements: load a .ady first.</p>
+      <section id="measure-step" class="step" hidden>
+        <h2 class="step-title"><span class="step-num">2</span> Add measurements</h2>
+        <div class="workbench">
+          <div class="workbench-left">
+            <div class="card chart-card">
+              <label class="field">
+                Channel
+                <select id="preview-channel" disabled></select>
+              </label>
+              <div id="preview-chart"></div>
+              <p id="preview-hint" class="hint">Pick REW files for a speaker to see its correction.</p>
+            </div>
+          </div>
+          <div class="workbench-right">
+            <div class="card">
+              <h3 class="card-title">REW measurements</h3>
+              <p class="hint">
+                Text exports from REW, about 3 positions per speaker is plenty. Speakers without files are left
+                unchanged.
+              </p>
+              <div id="speaker-rows"></div>
+              <p id="measure-error" class="error" hidden></p>
+            </div>
+            <div class="card">
+              <h3 class="card-title">Correction</h3>
+              <label class="field">
+                Cutoff (Hz)
+                <input type="number" id="cutoff" step="50" />
+              </label>
+              <p class="hint">
+                No correction below the cutoff; it fades in over an octave around it. Each curve keeps its level at
+                1 kHz.
+              </p>
+              <table id="correction-table" hidden>
+                <thead>
+                  <tr>
+                    <th>Channel</th>
+                    <th>Positions</th>
+                    <th>Error RMS 2–20 kHz (dB)</th>
+                    <th>Largest trim (dB)</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <p id="measure-warnings" class="warning" hidden></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <p id="download-placeholder" class="placeholder">3 · Download: available once measurements are added.</p>
+      <section id="download-section" class="card step" hidden>
+        <h2 class="step-title"><span class="step-num">3</span> Download</h2>
+        <ul id="download-summary" class="checklist"></ul>
+        <button type="button" id="download">Download .ady</button>
+      </section>
+    </div>
+    <script type="module" src="/src/correct/main.ts"></script>
+  </body>
+</html>

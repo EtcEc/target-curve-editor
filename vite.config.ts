@@ -12,6 +12,7 @@ export default defineConfig({
       input: {
         index: page('./index.html'),
         design: page('./design.html'),
+        correct: page('./correct.html'),
       },
     },
   },
