@@ -150,28 +150,32 @@ async function recompute(): Promise<void> {
   if (!current) return;
   const mine = ++generation;
   const speakers: SpeakerInput[] = [];
-  for (const input of speakerRows.querySelectorAll<HTMLInputElement>('input[type="file"]')) {
-    const files = Array.from(input.files ?? []);
-    if (files.length === 0) continue;
-    speakers.push({
-      commandId: input.dataset.channel as string,
-      files: await Promise.all(files.map(async (f) => ({ name: f.name, text: await f.text() }))),
-    });
-  }
-  if (mine !== generation) return;
-  if (speakers.length === 0) {
-    result = null;
-    show(measureError, null);
-  } else {
-    try {
+  try {
+    for (const input of speakerRows.querySelectorAll<HTMLInputElement>('input[type="file"]')) {
+      const files = Array.from(input.files ?? []);
+      if (files.length === 0) continue;
+      speakers.push({
+        commandId: input.dataset.channel as string,
+        files: await Promise.all(files.map(async (f) => ({ name: f.name, text: await f.text() }))),
+      });
+    }
+    if (mine !== generation) return;
+    if (speakers.length === 0) {
+      result = null;
+      show(measureError, null);
+    } else {
       result = measureCorrection(current, speakers);
       show(measureError, null);
-    } catch (err) {
+    }
+  } catch (err) {
+    if (mine === generation) {
       result = null;
       show(measureError, (err as Error).message);
     }
   }
-  render();
+  if (mine === generation) {
+    render();
+  }
 }
 
 function renderTable(): void {
