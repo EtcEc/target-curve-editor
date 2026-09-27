@@ -12,6 +12,12 @@ import {
   MIN_CUTOFF_HZ,
   buildChannelTrims,
   summarizeCorrection,
+  DEFAULT_TRIM_OPTIONS,
+  DETAIL_STEPS,
+  MAX_LIMIT_DB,
+  MIN_LIMIT_DB,
+  formatOctaves,
+  type TrimOptions,
 } from '../correction';
 import { previewCurves } from '../correctionPreview';
 import { correctChecklist, measuredFilename } from '../downloadSummary';
@@ -39,6 +45,12 @@ const cutoffInput = el<HTMLInputElement>('cutoff');
 const correctionTable = el<HTMLElement>('correction-table');
 const correctionBody = correctionTable.querySelector('tbody') as HTMLElement;
 const measureWarnings = el<HTMLElement>('measure-warnings');
+const detailInput = el<HTMLInputElement>('detail');
+const detailValue = el<HTMLElement>('detail-value');
+const strengthInput = el<HTMLInputElement>('strength');
+const strengthValue = el<HTMLElement>('strength-value');
+const limitInput = el<HTMLInputElement>('limit');
+const limitValue = el<HTMLElement>('limit-value');
 const previewChannel = el<HTMLSelectElement>('preview-channel');
 const previewContainer = el<HTMLElement>('preview-chart');
 const previewHint = el<HTMLElement>('preview-hint');
@@ -54,10 +66,35 @@ let cutoffHz = DEFAULT_CUTOFF_HZ;
 let chart: ReturnType<typeof createPreviewChart> | null = null;
 /** Bumped on every change of inputs, so a slow file read can't overwrite a newer result. */
 let generation = 0;
+/** Detail, strength and limit, as set by the sliders. */
+const trimOptions: TrimOptions = { ...DEFAULT_TRIM_OPTIONS };
 
 cutoffInput.min = String(MIN_CUTOFF_HZ);
 cutoffInput.max = String(MAX_CUTOFF_HZ);
 cutoffInput.value = String(DEFAULT_CUTOFF_HZ);
+
+detailInput.min = '0';
+detailInput.max = String(DETAIL_STEPS.length - 1);
+detailInput.step = '1';
+detailInput.value = String(DETAIL_STEPS.indexOf(DEFAULT_TRIM_OPTIONS.detailOctaves));
+strengthInput.min = '0';
+strengthInput.max = '100';
+strengthInput.step = '10';
+strengthInput.value = String(DEFAULT_TRIM_OPTIONS.strength * 100);
+limitInput.min = String(MIN_LIMIT_DB);
+limitInput.max = String(MAX_LIMIT_DB);
+limitInput.step = '0.5';
+limitInput.value = String(DEFAULT_TRIM_OPTIONS.limitDb);
+
+/** Reads the three sliders into `trimOptions` and shows their values. */
+function readSettings(): void {
+  trimOptions.detailOctaves = DETAIL_STEPS[Number(detailInput.value)] ?? DEFAULT_TRIM_OPTIONS.detailOctaves;
+  trimOptions.strength = Number(strengthInput.value) / 100;
+  trimOptions.limitDb = Number(limitInput.value);
+  detailValue.textContent = `${formatOctaves(trimOptions.detailOctaves)} oct`;
+  strengthValue.textContent = `${Math.round(trimOptions.strength * 100)}%`;
+  limitValue.textContent = `±${trimOptions.limitDb} dB`;
+}
 
 /** Shows `message` in `node`, or hides the node when `message` is null. */
 function show(node: HTMLElement, message: string | null): void {
@@ -200,7 +237,7 @@ function renderTable(): void {
     show(measureWarnings, null);
     return;
   }
-  const trims = summarizeCorrection(result.correction, cutoffHz);
+  const trims = summarizeCorrection(result.correction, cutoffHz, trimOptions);
   for (const report of result.reports) {
     const largest = trims.find((t) => t.commandId === report.commandId)?.maxAbsTrim ?? 0;
     const tr = document.createElement('tr');
@@ -237,7 +274,7 @@ function renderPreview(): void {
     return;
   }
   previewChannel.value = keep;
-  updatePreviewChart(chart, previewCurves(channel, rolloffType, result.correction[keep], cutoffHz));
+  updatePreviewChart(chart, previewCurves(channel, rolloffType, result.correction[keep], cutoffHz, trimOptions));
 }
 
 function render(): void {
@@ -248,7 +285,7 @@ function render(): void {
   downloadPlaceholder.hidden = ready;
   renderTable();
   renderPreview();
-  if (result) renderChecklist(downloadSummary, correctChecklist(Object.keys(result.correction), cutoffHz));
+  if (result) renderChecklist(downloadSummary, correctChecklist(Object.keys(result.correction), cutoffHz, trimOptions));
 }
 
 function cutoffValid(): boolean {
@@ -271,6 +308,13 @@ cutoffInput.addEventListener('change', () => {
 
 previewChannel.addEventListener('change', () => renderPreview());
 
+for (const input of [detailInput, strengthInput, limitInput]) {
+  input.addEventListener('input', () => {
+    readSettings();
+    render();
+  });
+}
+
 fileInput.addEventListener('change', () => {
   const file = fileInput.files?.[0];
   if (file) void loadFile(file);
@@ -292,7 +336,7 @@ dropzone.addEventListener('drop', (event) => {
 
 downloadButton.addEventListener('click', () => {
   if (!ady || !result) return;
-  const corrected = applyMeasuredCorrection(ady, buildChannelTrims(result.correction, cutoffHz));
+  const corrected = applyMeasuredCorrection(ady, buildChannelTrims(result.correction, cutoffHz, trimOptions));
   const url = URL.createObjectURL(new Blob([serializeAdy(corrected)], { type: 'application/json' }));
   const a = document.createElement('a');
   a.href = url;
@@ -301,5 +345,6 @@ downloadButton.addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
+readSettings();
 bindFileNames();
 render();

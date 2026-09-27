@@ -65,6 +65,25 @@
                 Nothing changes below cutoff ÷ √2; the correction fades in over the octave centred on the cutoff.
                 Each curve keeps its level at 1 kHz.
               </p>
+              <div class="settings">
+                <label class="field">
+                  Detail
+                  <span class="range-row"><input type="range" id="detail" /><output id="detail-value"></output></span>
+                </label>
+                <label class="field">
+                  Strength
+                  <span class="range-row"><input type="range" id="strength" /><output id="strength-value"></output></span>
+                </label>
+                <label class="field">
+                  Limit
+                  <span class="range-row"><input type="range" id="limit" /><output id="limit-value"></output></span>
+                </label>
+              </div>
+              <p class="hint">
+                Detail is how wide an area the measured error is averaged over: small values follow narrower
+                features, large values correct only broad trends. Strength is how much of the error is corrected.
+                Limit caps every cut and boost.
+              </p>
               <table id="correction-table" hidden>
                 <thead>
                   <tr>
