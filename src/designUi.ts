@@ -74,11 +74,19 @@ export function initDesignUi(host: DesignUiHost): { refreshSlots(): void; clearE
     loadInput.value = ''; // so choosing the same file again still loads it
   });
 
-  function button(text: string, title: string, onClick: () => void): HTMLButtonElement {
+  function button(
+    text: string,
+    title: string,
+    onClick: () => void,
+    className: string,
+    disabled = false
+  ): HTMLButtonElement {
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = text;
     b.title = title;
+    b.className = className;
+    b.disabled = disabled;
     b.addEventListener('click', onClick);
     return b;
   }
@@ -99,33 +107,42 @@ export function initDesignUi(host: DesignUiHost): { refreshSlots(): void; clearE
     status.textContent = saved === null ? 'empty' : saved.length === 0 ? 'flat' : `${saved.length} band${saved.length === 1 ? '' : 's'}`;
     row.append(swatch, label, status);
 
-    row.appendChild(
-      button('Save here', `Store the current design in slot ${id} and draw it faintly on the chart`, () => {
-        const problem = validateBands(host.params.bands);
-        if (problem !== null) {
-          showError(`Fix the band values before saving to a slot. ${problem}`);
-          return;
-        }
-        showError(null);
-        host.slots.save(id, host.params.bands);
-        refreshSlots();
-        host.onSlotsChanged();
-      })
-    );
-    if (saved !== null) {
-      row.appendChild(
-        button('Load', `Make slot ${id} the design you are editing (replaces the current bands)`, () => {
-          host.replaceDesign(host.slots.get(id) ?? [], undefined, `Loaded slot ${id}.`);
-        })
-      );
-      row.appendChild(
-        button('Clear', `Empty slot ${id}`, () => {
+    row.append(
+      button(
+        'Save here',
+        `Store the current design in slot ${id} and draw it faintly on the chart`,
+        () => {
+          const problem = validateBands(host.params.bands);
+          if (problem !== null) {
+            showError(`Fix the band values before saving to a slot. ${problem}`);
+            return;
+          }
+          showError(null);
+          host.slots.save(id, host.params.bands);
+          refreshSlots();
+          host.onSlotsChanged();
+        },
+        'small'
+      ),
+      button(
+        'Load',
+        `Make slot ${id} the design you are editing (replaces the current bands)`,
+        () => host.replaceDesign(host.slots.get(id) ?? [], undefined, `Loaded slot ${id}.`),
+        'small ghost',
+        saved === null
+      ),
+      button(
+        'Clear',
+        `Empty slot ${id}`,
+        () => {
           host.slots.clear(id);
           refreshSlots();
           host.onSlotsChanged();
-        })
-      );
-    }
+        },
+        'small ghost',
+        saved === null
+      )
+    );
     return row;
   }
 

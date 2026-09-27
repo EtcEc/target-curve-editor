@@ -84,12 +84,18 @@ export function initBandsUi(
     header.appendChild(enabled);
 
     const title = document.createElement('strong');
-    title.textContent = `${index + 1}. ${BAND_LABELS[band.type]}`;
+    title.textContent = `Band ${index + 1}`;
     header.appendChild(title);
+
+    const badge = document.createElement('span');
+    badge.className = 'badge';
+    badge.textContent = BAND_LABELS[band.type];
+    header.appendChild(badge);
 
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.textContent = '✕';
+    remove.className = 'small ghost';
     remove.title = 'Delete this band';
     remove.setAttribute('aria-label', `Delete band ${index + 1}`);
     remove.addEventListener('click', () => {
@@ -105,6 +111,7 @@ export function initBandsUi(
     fields.className = 'band-fields';
     for (const spec of fieldsFor(band.type)) {
       const label = document.createElement('label');
+      label.className = 'field';
       label.textContent = spec.label;
       const input = document.createElement('input');
       input.type = 'number';

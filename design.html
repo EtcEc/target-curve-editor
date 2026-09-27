@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Design a Target Curve · Audyssey Target Curve Editor</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="site-header">
+        <h1><a href="./index.html">Audyssey Target Curve Editor</a></h1>
+        <nav><span class="nav-current">Design a curve</span> · <a href="./correct.html">Apply a measured correction</a></nav>
+      </header>
+
+      <section class="card">
+        <h2 class="step-title"><span class="step-num">1</span> Load your .ady</h2>
+        <p class="hint">The raw file from MultEQ-X. This is the file the download edits.</p>
+        <div id="dropzone" class="dropzone">
+          <p>Drop a .ady file here, or</p>
+          <label class="file-pick">
+            <input type="file" id="file-input" accept=".ady" class="visually-hidden" />
+            <span class="button">Choose .ady…</span>
+            <span class="file-name" data-for="file-input">No file chosen</span>
+          </label>
+        </div>
+        <p id="error-message" class="error" hidden></p>
+      </section>
+
+      <p id="editor-placeholder" class="placeholder">2 · Design the curve: load a .ady first.</p>
+      <section id="editor" class="step" hidden>
+        <h2 class="step-title"><span class="step-num">2</span> Design the curve</h2>
+        <div class="workbench">
+          <div class="workbench-left">
+            <div class="card chart-card">
+              <div id="chart"></div>
+              <p class="hint">Drag a shelf or bell handle to move it; scroll over a handle to change its Q.</p>
+            </div>
+            <div class="card">
+              <h3 class="card-title">Compare</h3>
+              <p class="hint">
+                Save the current design into a slot to see it drawn faintly while you keep editing. Load a slot to
+                make it the design you edit and download.
+              </p>
+              <div id="slot-list"></div>
+            </div>
+          </div>
+          <div class="workbench-right">
+            <div class="card">
+              <h3 class="card-title">Audyssey behaviour</h3>
+              <label class="field">
+                HF rolloff type
+                <select id="rolloff-type">
+                  <option value="1">High Frequency Roll Off 1</option>
+                  <option value="2">High Frequency Roll Off 2</option>
+                </select>
+              </label>
+              <p id="rolloff-notice" class="warning" hidden></p>
+              <label class="check"><input type="checkbox" id="cancel-rolloff" checked /> Cancel Audyssey's HF rolloff</label>
+              <p class="hint">Untick to see the rolloff on the curve, as the AVR applies it.</p>
+              <label class="check"><input type="checkbox" id="sub-trim" checked /> Compensate sub trim</label>
+              <p id="sub-trim-notice" class="warning" hidden></p>
+              <p id="sub-trim-peak" class="hint" hidden></p>
+            </div>
+            <div class="card">
+              <h3 class="card-title">Curve bands</h3>
+              <div class="toolbar">
+                <label class="field">
+                  Preset
+                  <select id="preset-select">
+                    <option value="">Load preset…</option>
+                  </select>
+                </label>
+                <div class="toolbar-group">
+                  <label class="field">
+                    Add band
+                    <select id="add-band-type"></select>
+                  </label>
+                  <button type="button" id="add-band" class="ghost">Add</button>
+                </div>
+              </div>
+              <p id="preset-description" class="hint"></p>
+              <div id="band-list"></div>
+              <p id="band-error" class="error" hidden></p>
+              <p id="band-level" class="hint"></p>
+            </div>
+            <div class="card">
+              <h3 class="card-title">Save or load a design</h3>
+              <div class="toolbar">
+                <label class="field">
+                  Design name
+                  <input type="text" id="design-name" placeholder="e.g. My target" maxlength="60" />
+                </label>
+                <button type="button" id="design-save">Save design</button>
+                <label class="file-pick">
+                  <input type="file" id="design-load" accept=".json,application/json" class="visually-hidden" />
+                  <span class="button ghost">Load design…</span>
+                </label>
+              </div>
+              <p id="design-file-error" class="error" hidden></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <p id="download-placeholder" class="placeholder">3 · Download: available once a .ady is loaded.</p>
+      <section id="download-section" class="card step" hidden>
+        <h2 class="step-title"><span class="step-num">3</span> Download</h2>
+        <ul id="download-summary" class="checklist"></ul>
+        <p id="no-subwoofer-warning" class="warning" hidden>
+          No subwoofer channel detected, so there is no sub trim to compensate.
+        </p>
+        <button type="button" id="download">Download .ady</button>
+      </section>
+    </div>
+    <script type="module" src="/src/design/main.ts"></script>
+  </body>
+</html>

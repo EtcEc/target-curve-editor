@@ -7,102 +7,30 @@
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <div id="app">
-      <h1>Audyssey Target Curve Editor</h1>
-
-      <h2 class="step-heading"><span class="step-num">1</span> Load your .ady</h2>
-      <p class="hint">The raw file from MultEQ-X: your starting point. This is the file the download edits.</p>
-      <section id="dropzone">
-        <p>Drag and drop a .ady file here, or click to choose one.</p>
-        <input type="file" id="file-input" accept=".ady" />
-      </section>
-
-      <p id="error-message" class="error" hidden></p>
-
-      <p id="editor-placeholder" class="placeholder">2. Design the curve — load a .ady in step 1 first.</p>
-      <section id="editor" class="step" hidden>
-        <h2 class="step-heading"><span class="step-num">2</span> Design the curve</h2>
-        <fieldset id="audyssey-behaviour">
-          <legend>Audyssey behaviour</legend>
-          <label>
-            HF rolloff type
-            <select id="rolloff-type">
-              <option value="1">High Frequency Roll Off 1</option>
-              <option value="2">High Frequency Roll Off 2</option>
-            </select>
-          </label>
-          <p id="rolloff-notice" class="warning" hidden></p>
-          <label>
-            <input type="checkbox" id="cancel-rolloff" checked />
-            Cancel Audyssey's HF rolloff
-            <small>(untick to see the rolloff on the curve, as the AVR applies it)</small>
-          </label>
-          <label>
-            <input type="checkbox" id="sub-trim" checked />
-            Compensate sub trim
-          </label>
-          <p id="sub-trim-notice" class="warning" hidden></p>
-          <p id="sub-trim-peak" class="hint" hidden></p>
-        </fieldset>
-
-        <div id="bands">
-          <h3>Curve bands</h3>
-          <div id="band-toolbar">
-            <label>
-              Preset
-              <select id="preset-select">
-                <option value="">Load preset…</option>
-              </select>
-            </label>
-            <span id="add-band-group">
-              <select id="add-band-type" aria-label="Band type to add"></select>
-              <button type="button" id="add-band">Add band</button>
-            </span>
-          </div>
-          <p id="preset-description" class="hint"></p>
-          <div id="design-file-row">
-            <label>
-              Design name
-              <input type="text" id="design-name" placeholder="e.g. My target" maxlength="60" />
-            </label>
-            <button type="button" id="design-save">Save design</button>
-            <label class="file-pick">
-              Load design
-              <input type="file" id="design-load" accept=".json,application/json" />
-            </label>
-          </div>
-          <p id="design-file-error" class="error" hidden></p>
-          <div id="band-list"></div>
-          <p id="band-error" class="error" hidden></p>
-          <p id="band-level" class="hint"></p>
-        </div>
-
-        <div id="chart"></div>
-        <p class="hint">
-          Drag a shelf or bell handle on the chart to move it; scroll over a handle to change its Q.
-        </p>
-
-        <div id="slots">
-          <h3>Compare</h3>
-          <p class="hint">
-            Save the current design into a slot to see it drawn faintly on the chart while you keep editing.
-            Load a slot to make it the design you edit and download.
+    <div class="page">
+      <header class="site-header">
+        <h1>Audyssey Target Curve Editor</h1>
+      </header>
+      <p class="hint">
+        Edit the target curves in an Audyssey MultEQ-X .ady file. Everything runs in your browser; nothing is
+        uploaded.
+      </p>
+      <div class="choices">
+        <a class="card choice" href="./design.html">
+          <h2>Design a target curve</h2>
+          <p>
+            Start from the raw .ady from MultEQ-X. Build the curve from presets and bands, compare designs, and
+            download the .ady.
           </p>
-          <div id="slot-list"></div>
-        </div>
-
-      </section>
-
-      <p id="download-placeholder" class="placeholder">3. Download — available once a .ady is loaded.</p>
-      <section id="download-section" class="step" hidden>
-        <h2 class="step-heading"><span class="step-num">3</span> Download</h2>
-        <ul id="download-summary" class="checklist"></ul>
-        <p id="no-subwoofer-warning" class="warning" hidden>
-          No subwoofer channel detected, so there is no sub trim to compensate.
-        </p>
-        <button id="download">Download .ady</button>
-      </section>
+        </a>
+        <a class="card choice" href="./correct.html">
+          <h2>Apply a measured correction</h2>
+          <p>
+            Start from a .ady this tool made, plus REW measurements taken with it loaded on the AVR. Download the
+            corrected .ady, and repeat to refine.
+          </p>
+        </a>
+      </div>
     </div>
-    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

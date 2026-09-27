@@ -6,17 +6,18 @@ import {
   serializeAdy,
   AdyValidationError,
   type AdyFile,
-} from './ady';
-import { initBandsUi } from './bandsUi';
-import { sumBands, validateBands, type Band } from './bands';
-import { createChart, slotCurveData, updateChart } from './chart';
-import { initDesignUi } from './designUi';
-import { buildFilenameSuffix, designChecklist } from './downloadSummary';
-import { computeTrimShift, subTrimPeakAboveSub, type CurveParams } from './curve';
-import { DEFAULT_PRESET_NAME, presetBands } from './presets';
-import { isRolloffType } from './rolloff';
-import { SLOT_IDS, createSlots } from './slots';
-import { renderChecklist } from './ui/checklist';
+} from '../ady';
+import { initBandsUi } from '../bandsUi';
+import { sumBands, validateBands, type Band } from '../bands';
+import { createChart, slotCurveData, updateChart } from '../chart';
+import { initDesignUi } from '../designUi';
+import { buildFilenameSuffix, designChecklist } from '../downloadSummary';
+import { computeTrimShift, subTrimPeakAboveSub, type CurveParams } from '../curve';
+import { DEFAULT_PRESET_NAME, presetBands } from '../presets';
+import { isRolloffType } from '../rolloff';
+import { SLOT_IDS, createSlots } from '../slots';
+import { renderChecklist } from '../ui/checklist';
+import { bindFileNames, showFileName } from '../ui/filePick';
 
 let currentAdy: AdyFile | null = null;
 let chart: ReturnType<typeof createChart> | null = null;
@@ -94,13 +95,20 @@ function applyFileDefaults(ady: AdyFile): void {
   params.subTrim = !processed;
   subTrimInput.checked = params.subTrim;
   if (processed) {
-    subTrimNotice.textContent =
-      'This file already has a target curve written by this tool, so its sub trim was probably already compensated. Sub trim compensation is off; tick it if you know it is not.';
+    const link = document.createElement('a');
+    link.href = './correct.html';
+    link.textContent = 'Correct page';
+    subTrimNotice.replaceChildren(
+      'This file already has a target curve written by this tool, so its sub trim was probably already compensated. Sub trim compensation is off; tick it if you know it is not. To add a measured correction to this file, use the ',
+      link,
+      ' instead.'
+    );
   }
   subTrimNotice.hidden = !processed;
 }
 
 function loadFile(file: File): void {
+  showFileName('file-input', file.name);
   const reader = new FileReader();
   reader.onload = () => {
     const text = reader.result as string;
@@ -182,10 +190,14 @@ fileInput.addEventListener('change', () => {
 
 dropzone.addEventListener('dragover', (event) => {
   event.preventDefault();
+  dropzone.classList.add('dragover');
 });
+
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
 
 dropzone.addEventListener('drop', (event) => {
   event.preventDefault();
+  dropzone.classList.remove('dragover');
   const file = event.dataTransfer?.files?.[0];
   if (file) loadFile(file);
 });
@@ -226,4 +238,5 @@ downloadButton.addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
+bindFileNames();
 onParamsChanged();

@@ -5,6 +5,40 @@ import { attachHandles } from './chartHandles';
 import { resultGain, type CurveParams } from './curve';
 import { SLOT_COLORS, SLOT_IDS } from './slots';
 
+/** Wide screens show the chart beside the tools; narrow ones stick a short chart above them. */
+const WIDE_LAYOUT = '(min-width: 960px)';
+
+function chartHeight(): number {
+  return window.matchMedia(WIDE_LAYOUT).matches ? 420 : 220;
+}
+
+/** Scales, axes and cursor shared by every chart in the tool. */
+export function baseChartOptions(): Pick<uPlot.Options, 'scales' | 'axes' | 'cursor'> {
+  return {
+    // the axes are fixed and the handles use the mouse, so a drag must not zoom
+    cursor: { drag: { x: false, y: false } },
+    scales: {
+      x: { time: false, distr: 3, range: [20, 20000] },
+      y: { range: [-15, 15] },
+    },
+    axes: [
+      { label: 'Frequency (Hz)', stroke: '#ccc', grid: { stroke: '#333' } },
+      { label: 'Gain (dB)', stroke: '#ccc', grid: { stroke: '#333' } },
+    ],
+  };
+}
+
+/** Keeps `chart` as wide as `container` and as tall as the current layout wants. */
+export function fitChart(chart: uPlot, container: HTMLElement): void {
+  const fit = () => {
+    const width = container.clientWidth;
+    const height = chartHeight();
+    if (width > 0 && (width !== chart.width || height !== chart.height)) chart.setSize({ width, height });
+  };
+  new ResizeObserver(fit).observe(container);
+  window.matchMedia(WIDE_LAYOUT).addEventListener('change', fit);
+}
+
 /** Log-spaced sample points for a smooth chart line, independent of the .ady write grid. */
 export function chartFrequencies(): number[] {
   const points = 400;
@@ -54,19 +88,9 @@ export interface ChartCallbacks {
 export function createChart(container: HTMLElement, params: CurveParams, callbacks: ChartCallbacks): uPlot {
   let handles: ReturnType<typeof attachHandles> | null = null;
   const opts: uPlot.Options = {
-    title: 'Target Curve',
+    ...baseChartOptions(),
     width: container.clientWidth || 800,
-    height: 400,
-    // the axes are fixed and the handles use the mouse, so a drag must not zoom
-    cursor: { drag: { x: false, y: false } },
-    scales: {
-      x: { time: false, distr: 3, range: [20, 20000] },
-      y: { range: [-15, 15] },
-    },
-    axes: [
-      { label: 'Frequency (Hz)', stroke: '#ccc', grid: { stroke: '#333' } },
-      { label: 'Gain (dB)', stroke: '#ccc', grid: { stroke: '#333' } },
-    ],
+    height: chartHeight(),
     series: [
       {},
       ...SLOT_IDS.map((id) => ({ label: id, stroke: SLOT_COLORS[id], width: 1.5, show: false })),
@@ -83,6 +107,7 @@ export function createChart(container: HTMLElement, params: CurveParams, callbac
     },
   };
   const chart = new uPlot(opts, chartData(params, []), container);
+  fitChart(chart, container);
   return chart;
 }
 
