@@ -73,10 +73,25 @@ function cell(text: string): HTMLTableCellElement {
 
 async function loadFile(file: File): Promise<void> {
   showFileName('file-input', file.name);
-  generation++;
+  const mine = ++generation;
+  let text: string;
+  try {
+    text = await file.text();
+  } catch (err) {
+    if (mine !== generation) return;
+    ady = null;
+    result = null;
+    show(fileInfo, null);
+    show(errorMessage, `Could not read file: ${(err as Error).message}`);
+    show(measureError, null);
+    buildRows();
+    render();
+    return;
+  }
+  if (mine !== generation) return;
   result = null;
   try {
-    const parsed = parseAdy(await file.text());
+    const parsed = parseAdy(text);
     rolloffType = checkMeasuredType(parsed);
     const speakers = parsed.detectedChannels.filter((c) => !isSubwooferChannel(c));
     if (!speakers.some((c) => c.customTargetCurvePoints.length > 0)) {

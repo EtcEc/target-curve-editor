@@ -73,8 +73,8 @@ describe('buildFilenameSuffix', () => {
 describe('correctChecklist', () => {
   it('names the corrected channels and the cutoff, and says what stays the same', () => {
     expect(correctChecklist(['FL', 'FR', 'C'], 500)).toEqual([
-      { text: 'Measured correction on FL, FR, C above 500 Hz', on: true },
-      { text: 'Curves unchanged at 1 kHz and below the cutoff', on: true },
+      { text: 'Measured correction on FL, FR, C, fading in from 354 Hz to 707 Hz (cutoff 500 Hz)', on: true },
+      { text: 'Unchanged below the fade; each curve keeps its level at 1 kHz', on: true },
       { text: 'Sub, channel levels and HF rolloff unchanged', on: true },
     ]);
   });

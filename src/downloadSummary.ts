@@ -61,9 +61,14 @@ export function buildFilenameSuffix(params: CurveParams): string {
 
 /** What the Correct page's download will contain. */
 export function correctChecklist(channels: readonly string[], cutoffHz: number): ChecklistItem[] {
+  const lo = Math.round(cutoffHz / Math.SQRT2);
+  const hi = Math.round(cutoffHz * Math.SQRT2);
   return [
-    { text: `Measured correction on ${channels.join(', ')} above ${cutoffHz} Hz`, on: true },
-    { text: 'Curves unchanged at 1 kHz and below the cutoff', on: true },
+    {
+      text: `Measured correction on ${channels.join(', ')}, fading in from ${lo} Hz to ${hi} Hz (cutoff ${cutoffHz} Hz)`,
+      on: true,
+    },
+    { text: 'Unchanged below the fade; each curve keeps its level at 1 kHz', on: true },
     { text: 'Sub, channel levels and HF rolloff unchanged', on: true },
   ];
 }

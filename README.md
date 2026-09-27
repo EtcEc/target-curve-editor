@@ -20,7 +20,7 @@ The start page offers two jobs:
    was on the AVR when you took REW measurements, and add the REW exports per
    speaker. The page shows each speaker's current target, measurement and
    corrected target, and downloads the file with the correction added on top of
-   its own curves (lined up and pinned at 1 kHz, nothing below the cutoff,
+   its own curves (lined up and pinned at 1 kHz, fading in around the cutoff,
    sub trim and channel levels untouched). Load the result on the AVR, measure
    again and repeat to refine.
 
