@@ -210,3 +210,8 @@ Test-first for all logic; UI checked in the browser.
 Carrying state between pages; loading or saving correction files; per-channel
 design curves; light theme; changing Audyssey's own behaviour or the sub-trim
 logic on the design page.
+
+## As built
+
+- The Design page puts "Save or load a design" in its own card below the bands
+  card, rather than inside the presets card.

@@ -7,20 +7,22 @@ runs in the browser.
 
 ## What it does
 
-1. **Load** the raw `.ady` from MultEQ-X.
-2. **Design the curve** as a sum of bands (tilt, low/high shelf, bell). Start
-   from a preset, add and edit bands, or drag a shelf/bell handle on the chart
-   (scroll over a handle to change its Q). Choose Audyssey's HF rolloff type
-   (read from the file) and whether to cancel it, and whether to compensate the
-   sub trim.
-3. **Compare** designs: save the current one into slot A, B or C and see it
-   drawn faintly while you keep editing. Save a design as a small JSON file and
-   load it again, for example to share it.
-4. **Measured correction (optional):** build a `correction.json` from REW
-   measurements (per-speaker trim above an adjustable cutoff) and apply it on
-   top of the curve.
-5. **Download** the corrected `.ady`. A line above the button states exactly
-   what it contains.
+The start page offers two jobs:
+
+1. **Design a target curve.** Load the raw `.ady` from MultEQ-X and design the
+   curve as a sum of bands (tilt, low/high shelf, bell). Start from a preset,
+   edit bands, or drag a shelf/bell handle on the chart (scroll over a handle to
+   change its Q). Choose Audyssey's HF rolloff type (read from the file), whether
+   to cancel it, and whether to compensate the sub trim. Save the design into
+   compare slot A, B or C to see it drawn faintly while you keep editing, or save
+   it as a small JSON file. Download the `.ady`.
+2. **Apply a measured correction.** Load a `.ady` this tool made, the one that
+   was on the AVR when you took REW measurements, and add the REW exports per
+   speaker. The page shows each speaker's current target, measurement and
+   corrected target, and downloads the file with the correction added on top of
+   its own curves (lined up and pinned at 1 kHz, nothing below the cutoff,
+   sub trim and channel levels untouched). Load the result on the AVR, measure
+   again and repeat to refine.
 
 Design files are `{ "version": 1, "name", "bands", "cancelRolloff" }`. The HF
 rolloff type is not in them; it comes from the `.ady`.
