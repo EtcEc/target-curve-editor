@@ -201,5 +201,13 @@ Built on 2026-09-26 (plan: `docs/superpowers/plans/2026-09-26-phase-2.md`).
   flat design with the rolloff cancelled peaks at 20 kHz), the page says what
   set the sub trim and suggests unticking it if the sub sounds too loud. Whether
   Audyssey normalises a sub's curve over the full band is still unverified.
-- **Not shipped:** the literature presets (Harman-style, B&K-style). The rule
-  above stands: they need a cited table reproduced within 0.5 dB.
+- **Literature presets, added 2026-09-27:** "Harman (approximate)" and "Toole
+  (approximate)", both a tilt plus a low shelf fitted from CSVs posted in an ASR
+  forum thread ("A collection of speaker target responses in csv/txt format"),
+  within 0.15 dB and 0.2 dB of that data respectively. A third file in the same
+  thread ("HATS") and the AutoEq Harman targets are headphone/HRTF-domain curves
+  (they include the human ear and head's own transfer function, which a room
+  microphone measurement does not) and were rejected as unsuitable, not merely
+  unavailable — using them as a room target would double-count what a listener's
+  own ears and room already add. No B&K curve was found; that preset stays
+  unshipped unless one turns up.

@@ -26,8 +26,13 @@ function writeGrid(): number[] {
 }
 
 describe('presets', () => {
-  it('ships Flat and the default preset, in that order', () => {
-    expect(PRESETS.map((p) => p.name)).toEqual(['Flat', 'Current (approximated)']);
+  it('ships Flat, the default preset and the two literature presets, in that order', () => {
+    expect(PRESETS.map((p) => p.name)).toEqual([
+      'Flat',
+      'Current (approximated)',
+      'Harman (approximate)',
+      'Toole (approximate)',
+    ]);
     expect(DEFAULT_PRESET_NAME).toBe('Current (approximated)');
   });
 
@@ -72,5 +77,50 @@ describe('presets', () => {
 
   it('throws for an unknown preset name', () => {
     expect(() => presetBands('nope')).toThrow(/nope/);
+  });
+
+  it('cites its source in both literature presets\' descriptions', () => {
+    for (const name of ['Harman (approximate)', 'Toole (approximate)']) {
+      const preset = PRESETS.find((p) => p.name === name)!;
+      expect(preset.description).toMatch(/audiosciencereview\.com/);
+      expect(preset.description).toMatch(/[Aa]pproximate/);
+    }
+  });
+
+  it('the Harman preset reproduces its cited reference points within 0.5 dB', () => {
+    const bands = presetBands('Harman (approximate)');
+    // (frequency, dB) points read from the source CSV
+    const reference: [number, number][] = [
+      [20.56470821166976, 6.147211212700341],
+      [47.75087106568793, 6.203439223819661],
+      [110.79319926891314, 2.4802330821352605],
+      [504.40908352705634, -0.6085083394865975],
+      [989.5574833838288, -0.8972467749641666],
+      [2499.3234023552486, -1.5659042044911615],
+      [6312.483687438776, -2.276352723363594],
+      [11383.219793966258, -2.65627171741302],
+      [18869.070264997543, -2.967805292533555],
+    ];
+    for (const [freq, gain] of reference) {
+      expect(Math.abs(sumBands(freq, bands) - gain)).toBeLessThan(0.5);
+    }
+  });
+
+  it('the Toole preset reproduces its cited reference points within 0.5 dB', () => {
+    const bands = presetBands('Toole (approximate)');
+    const reference: [number, number][] = [
+      [20.61619029268548, 3.6133707865168567],
+      [62.51093152949732, 3.4048110316649662],
+      [190.98012344351596, 2.4688049029622086],
+      [764.1394393351363, 1.061654749744637],
+      [1330.5965518353175, 0.5088457609805914],
+      [4034.5392996626247, 0.16459652706843997],
+      [7025.346165938076, -0.15829417773237964],
+      [16142.782520148392, -0.3668539325842666],
+      [19355.741537286776, -0.3530337078651655],
+    ];
+    for (const [freq, gain] of reference) {
+      expect(Math.abs(sumBands(freq, bands) - gain)).toBeLessThan(0.5);
+    }
   });
 });

@@ -8,6 +8,10 @@ export interface Preset {
 
 export const DEFAULT_PRESET_NAME = 'Current (approximated)';
 
+/** Both literature presets below are fitted from CSVs posted in this ASR forum thread. */
+const ASR_TARGETS_THREAD =
+  'https://www.audiosciencereview.com/forum/index.php?threads/a-collection-of-speaker-target-responses-in-csv-txt-format.16401/';
+
 export const PRESETS: readonly Preset[] = [
   {
     name: 'Flat',
@@ -22,6 +26,26 @@ export const PRESETS: readonly Preset[] = [
     bands: [
       { type: 'tilt', enabled: true, slope: 0.7, pivot: 1000, fLow: 50, fHigh: 20000 },
       { type: 'lowShelf', enabled: true, gain: 1.43, freq: 66.5, q: 0.9 },
+    ],
+  },
+  {
+    name: 'Harman (approximate)',
+    description:
+      `Approximate: the Harman in-room speaker target, fitted from a CSV posted at ${ASR_TARGETS_THREAD}. ` +
+      'Within 0.15 dB of that curve. A stronger, wider bass shelf and treble tilt than the default preset.',
+    bands: [
+      { type: 'tilt', enabled: true, slope: 0.48, pivot: 250, fLow: 450, fHigh: 20000 },
+      { type: 'lowShelf', enabled: true, gain: 6.63, freq: 105, q: 0.78 },
+    ],
+  },
+  {
+    name: 'Toole (approximate)',
+    description:
+      `Approximate: an in-room speaker target attributed to Floyd Toole, fitted from a CSV posted at ${ASR_TARGETS_THREAD}. ` +
+      'Within 0.2 dB of that curve. A subtler bass shelf and treble tilt than the default preset.',
+    bands: [
+      { type: 'tilt', enabled: true, slope: 0.19, pivot: 3880, fLow: 92, fHigh: 20000 },
+      { type: 'lowShelf', enabled: true, gain: 2.62, freq: 302, q: 0.38 },
     ],
   },
 ];
