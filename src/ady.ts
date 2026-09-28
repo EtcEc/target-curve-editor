@@ -28,10 +28,12 @@ function validateChannel(channel: unknown, index: number): asserts channel is Ad
   if (typeof channel.commandId !== 'string') {
     throw new AdyValidationError(`detectedChannels[${index}].commandId is missing or not a string`);
   }
+  // Some MultEQ-X files leave the key out on channels that never had a custom curve.
+  if (!('customTargetCurvePoints' in channel)) {
+    channel.customTargetCurvePoints = [];
+  }
   if (!Array.isArray(channel.customTargetCurvePoints)) {
-    throw new AdyValidationError(
-      `detectedChannels[${index}].customTargetCurvePoints is missing or not an array`
-    );
+    throw new AdyValidationError(`detectedChannels[${index}].customTargetCurvePoints is not an array`);
   }
   if (typeof channel.trimAdjustment !== 'string') {
     throw new AdyValidationError(`detectedChannels[${index}].trimAdjustment is missing or not a string`);

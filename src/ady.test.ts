@@ -31,6 +31,22 @@ describe('parseAdy', () => {
     expect(() => parseAdy(JSON.stringify(bad))).toThrow(AdyValidationError);
   });
 
+  it('reads a channel without customTargetCurvePoints as having no curve', () => {
+    // some MultEQ-X files leave the key out on channels that never had a custom curve
+    const raw = createSampleAdy();
+    // @ts-expect-error removing the key as those files do
+    delete raw.detectedChannels[0].customTargetCurvePoints;
+    const parsed = parseAdy(JSON.stringify(raw));
+    expect(parsed.detectedChannels[0].customTargetCurvePoints).toEqual([]);
+  });
+
+  it('rejects customTargetCurvePoints that is present but not an array', () => {
+    const bad = createSampleAdy();
+    // @ts-expect-error deliberately breaking the fixture for this test
+    bad.detectedChannels[0].customTargetCurvePoints = 'nope';
+    expect(() => parseAdy(JSON.stringify(bad))).toThrow(AdyValidationError);
+  });
+
   it('rejects a missing enTargetCurveType', () => {
     const bad = createSampleAdy();
     // @ts-expect-error deliberately breaking the fixture for this test
