@@ -95,7 +95,7 @@ export function measureCorrection(
 
   for (const speaker of active) {
     const channel = target.detectedChannels.find((c) => c.commandId === speaker.commandId);
-    if (!channel) throw new GenerateError(`The .ady has no channel ${speaker.commandId}.`);
+    if (!channel) throw new GenerateError(`The target file has no channel ${speaker.commandId}.`);
     if (isSubwooferChannel(channel)) {
       throw new GenerateError(`Channel ${speaker.commandId} is a subwoofer and can't be corrected.`);
     }

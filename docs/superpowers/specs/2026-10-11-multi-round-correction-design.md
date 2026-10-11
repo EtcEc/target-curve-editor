@@ -156,3 +156,8 @@ Test-first, synthetic data only (the repo is public).
 
 Remembering the target between visits; detecting automatically which file is
 the target; per-round history; changing the Design page.
+
+## As built
+
+- If the measured-with file can't be loaded, the page keeps the measurement step unavailable (it does not fall back to using the target as the measured-with file) until a good file is loaded or the field is cleared.
+- Known limitation: the pair check compares only rolloff type and speakers. If the measured-with file was not made from this target, its distance from the target can exceed the limit and is pulled back to it, and the checklist does not warn about that.

@@ -192,6 +192,7 @@ describe('checkFilePair', () => {
     const other = measuredAdy();
     other.enTargetCurveType = 0;
     expect(() => checkFilePair(measuredAdy(), other)).toThrow(/enTargetCurveType 0/);
+    expect(() => checkFilePair(other, measuredAdy())).toThrow(/enTargetCurveType 0/);
   });
 
   it('lists the speakers that are only in one of the files, ignoring subs', () => {
