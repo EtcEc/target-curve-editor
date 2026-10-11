@@ -1,6 +1,7 @@
 import {
   AdyValidationError,
   applyMeasuredCorrection,
+  subLevelShift,
   isSubwooferChannel,
   parseAdy,
   serializeAdy,
@@ -20,7 +21,7 @@ import {
   formatOctaves,
   type TrimOptions,
 } from '../correction';
-import { previewCurves } from '../correctionPreview';
+import { previewCurves, subPreviewCurves } from '../correctionPreview';
 import { correctChecklist, measuredFilename } from '../downloadSummary';
 import {
   checkFilePair,
@@ -32,7 +33,8 @@ import {
 import type { RolloffType } from '../rolloff';
 import { renderChecklist } from '../ui/checklist';
 import { bindFileNames, showFileName } from '../ui/filePick';
-import { createPreviewChart, updatePreviewChart } from './previewChart';
+import { createPreviewChart, setMeasuredLabel, updatePreviewChart } from './previewChart';
+import { buildSubCorrections, subStep, summarizeSubs, type SubCorrection } from '../subCorrection';
 
 function el<T extends HTMLElement>(id: string): T {
   const found = document.getElementById(id);
@@ -54,6 +56,7 @@ const measureStep = el<HTMLElement>('measure-step');
 const speakerRows = el<HTMLElement>('speaker-rows');
 const measureError = el<HTMLElement>('measure-error');
 const cutoffInput = el<HTMLInputElement>('cutoff');
+const correctSubInput = el<HTMLInputElement>('correct-sub');
 const correctionTable = el<HTMLElement>('correction-table');
 const correctionBody = correctionTable.querySelector('tbody') as HTMLElement;
 const measureWarnings = el<HTMLElement>('measure-warnings');
@@ -113,6 +116,18 @@ limitInput.value = String(DEFAULT_TRIM_OPTIONS.limitDb);
 /** The file the AVR was measured with: the second file, or the target in round 1. */
 function base(): AdyFile | null {
   return measuredWith ?? target;
+}
+
+/** The subs getting the speakers' common correction (none when unticked or nothing is measured yet). */
+function currentSubs(): SubCorrection[] {
+  const goal = target;
+  const other = base();
+  if (!result || !goal || !other || !paired || !correctSubInput.checked) return [];
+  return buildSubCorrections(goal, other, result.correction);
+}
+
+function subTrims(subs: readonly SubCorrection[]): Map<string, ReturnType<typeof subStep>> {
+  return new Map(subs.map((s) => [s.commandId, subStep(s, cutoffHz, trimOptions)]));
 }
 
 /** Reads the three sliders into `trimOptions` and shows their values. */
@@ -317,7 +332,7 @@ async function recompute(): Promise<void> {
   render();
 }
 
-function renderTable(): void {
+function renderTable(subs: readonly SubCorrection[]): void {
   correctionBody.replaceChildren();
   if (!result) {
     correctionTable.hidden = true;
@@ -337,14 +352,25 @@ function renderTable(): void {
     );
     correctionBody.appendChild(tr);
   }
+  for (const row of summarizeSubs(subs, cutoffHz, trimOptions)) {
+    const tr = document.createElement('tr');
+    tr.append(
+      cell(row.commandId),
+      cell(`from ${row.positions} speaker${row.positions === 1 ? '' : 's'}`),
+      cell('–'),
+      cell(row.maxThisRound.toFixed(2)),
+      cell(row.maxTotal.toFixed(2))
+    );
+    correctionBody.appendChild(tr);
+  }
   correctionTable.hidden = false;
   show(measureWarnings, result.warnings.length > 0 ? result.warnings.join(' ') : null);
 }
 
-function renderPreview(): void {
+function renderPreview(subs: readonly SubCorrection[]): void {
   if (!target || !paired) return;
   if (!chart) chart = createPreviewChart(previewContainer);
-  const ids = result ? Object.keys(result.correction) : [];
+  const ids = result ? [...Object.keys(result.correction), ...subs.map((s) => s.commandId)] : [];
   const keep = ids.includes(previewChannel.value) ? previewChannel.value : ids[0];
   previewChannel.replaceChildren(
     ...ids.map((id) => {
@@ -357,16 +383,17 @@ function renderPreview(): void {
   previewChannel.disabled = ids.length === 0;
   previewHint.hidden = ids.length > 0;
   const channel = keep ? target.detectedChannels.find((c) => c.commandId === keep) : undefined;
+  const sub = subs.find((s) => s.commandId === keep);
+  setMeasuredLabel(chart, sub ? 'Common to all speakers' : 'Measured');
   if (!result || !keep || !channel) {
     updatePreviewChart(chart, null, measuredWith !== null);
     return;
   }
   previewChannel.value = keep;
-  updatePreviewChart(
-    chart,
-    previewCurves(channel, rolloffType, result.correction[keep], cutoffHz, trimOptions),
-    measuredWith !== null
-  );
+  const curves = sub
+    ? subPreviewCurves(channel, rolloffType, sub, cutoffHz, trimOptions)
+    : previewCurves(channel, rolloffType, result.correction[keep], cutoffHz, trimOptions);
+  updatePreviewChart(chart, curves, measuredWith !== null);
 }
 
 function render(): void {
@@ -375,16 +402,25 @@ function render(): void {
   const ready = paired && result !== null;
   downloadSection.hidden = !ready;
   downloadPlaceholder.hidden = ready;
-  renderTable();
-  renderPreview();
-  if (result) {
+  const subs = currentSubs();
+  renderTable(subs);
+  renderPreview(subs);
+  const goal = target;
+  const other = base();
+  if (result && goal && other) {
+    const trims = subTrims(subs);
     renderChecklist(
       downloadSummary,
       correctChecklist(
         Object.keys(result.correction),
         cutoffHz,
         trimOptions,
-        measuredWith ? { name: measuredWithName, soFarDb: maxSoFar(result.correction) } : undefined
+        measuredWith ? { name: measuredWithName, soFarDb: maxSoFar(result.correction) } : undefined,
+        subs.map((s) => ({
+          commandId: s.commandId,
+          fromSpeakers: s.fromSpeakers,
+          levelDb: subLevelShift(goal, other, s.commandId, trims.get(s.commandId)!, trimOptions.limitDb),
+        }))
       )
     );
   }
@@ -408,7 +444,8 @@ cutoffInput.addEventListener('change', () => {
   if (!cutoffValid()) cutoffInput.value = String(cutoffHz);
 });
 
-previewChannel.addEventListener('change', () => renderPreview());
+previewChannel.addEventListener('change', () => renderPreview(currentSubs()));
+correctSubInput.addEventListener('change', () => render());
 
 for (const input of [detailInput, strengthInput, limitInput]) {
   input.addEventListener('input', () => {
@@ -448,7 +485,8 @@ downloadButton.addEventListener('click', () => {
     goal,
     other,
     buildChannelTrims(result.correction, cutoffHz, trimOptions),
-    trimOptions.limitDb
+    trimOptions.limitDb,
+    subTrims(currentSubs())
   );
   const url = URL.createObjectURL(new Blob([serializeAdy(corrected)], { type: 'application/json' }));
   const a = document.createElement('a');

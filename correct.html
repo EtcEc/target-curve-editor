@@ -77,8 +77,13 @@
                 <input type="number" id="cutoff" step="any" />
               </label>
               <p class="hint">
-                Nothing changes below cutoff ÷ √2; the correction fades in over the octave centred on the cutoff.
-                Each curve keeps its level at 1 kHz.
+                0 corrects the full range. Above 0, nothing changes below cutoff ÷ √2 and the correction fades in over
+                the octave centred on the cutoff. Each curve keeps its level at 1 kHz.
+              </p>
+              <label class="check"><input type="checkbox" id="correct-sub" checked /> Correct the sub</label>
+              <p class="hint">
+                What all speakers share in the bass goes to the sub, what one speaker has on its own goes to that
+                speaker. Its level is kept where it was.
               </p>
               <div class="settings">
                 <label class="field">

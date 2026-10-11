@@ -40,3 +40,12 @@ export function updatePreviewChart(chart: uPlot, curves: PreviewCurves | null, s
       : emptyData()
   );
 }
+
+/** Index of the "Measured" series. */
+const MEASURED = 2;
+
+/** Renames the "Measured" line, e.g. to "Common to all speakers" while a sub is shown. */
+export function setMeasuredLabel(chart: uPlot, text: string): void {
+  const label = chart.root.querySelectorAll('.u-legend .u-series')[MEASURED]?.querySelector('.u-label');
+  if (label && label.textContent !== text) label.textContent = text;
+}

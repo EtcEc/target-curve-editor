@@ -26,6 +26,12 @@ The start page offers two jobs:
    fading in around the cutoff, never more than the limit from your target; sub
    trim and channel levels untouched). Load it on the AVR, measure again, and
    repeat with it as the measured-with file.
+   The sub is corrected too ("Correct the sub", on by default): what every
+   measured speaker has in common in the bass is the sub playing, so that part
+   goes to the sub, below about twice the crossover, while each speaker gets
+   its own error. The sub's trim moves with its curve's peak so its level stays
+   where it was. The cutoff defaults to 0 (full range); set it higher to leave
+   everything below it alone.
 
 Design files are `{ "version": 1, "name", "bands", "cancelRolloff" }`. The HF
 rolloff type is not in them; it comes from the `.ady`.
