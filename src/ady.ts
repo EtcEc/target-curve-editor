@@ -100,49 +100,95 @@ export function applyCurveToAdy(ady: AdyFile, params: CurveParams): AdyFile {
 
 export class MeasuredCorrectionError extends Error {}
 
+type CurvePoints = { freqs: number[]; gains: number[] };
+
+/** The target's and the measured-with file's curve for one channel, or a refusal naming what is missing. */
+function curvePair(target: AdyFile, channel: AdyChannel): { goal: CurvePoints; current: CurvePoints } {
+  const targetChannel = target.detectedChannels.find((c) => c.commandId === channel.commandId);
+  const goal = targetChannel ? readCurvePoints(targetChannel) : { freqs: [], gains: [] };
+  if (goal.freqs.length === 0) {
+    throw new MeasuredCorrectionError(
+      `Channel ${channel.commandId} has no target curve. Design one on the Design page first.`
+    );
+  }
+  const current = readCurvePoints(channel);
+  if (current.freqs.length === 0) {
+    throw new MeasuredCorrectionError(`Channel ${channel.commandId} has no curve in the file you measured with.`);
+  }
+  return { goal, current };
+}
+
+/** target + clamp(measured-with - target + trim, +/- limit) on the write grid, as written points. */
+function correctedPoints(goal: CurvePoints, current: CurvePoints, trim: TrimFn, limitDb: number): string[] {
+  return frequencyGrid().map((f) => {
+    const t = interpLogFreq(goal.freqs, goal.gains, f);
+    const soFar = interpLogFreq(current.freqs, current.gains, f) - t;
+    return formatPoint(f, t + clampTotal(soFar, trim(f), limitDb));
+  });
+}
+
+/** Highest gain among written points. */
+function peakOf(points: readonly string[]): number {
+  return Math.max(...points.map((p) => parseFloat(p.split(',')[1])));
+}
+
+function checkLimit(limitDb: number): void {
+  if (!(Number.isFinite(limitDb) && limitDb > 0)) {
+    throw new MeasuredCorrectionError(`Limit must be a positive number of dB, got ${limitDb}`);
+  }
+}
+
+/**
+ * How much a sub's trimAdjustment moves when its curve gets `trim`: Audyssey
+ * shifts a sub's curve so its highest point is at 0 dB, so the trim follows
+ * the change in the written curve's peak to keep the sub's level.
+ */
+export function subLevelShift(
+  target: AdyFile,
+  measuredWith: AdyFile,
+  subId: string,
+  trim: TrimFn,
+  limitDb: number
+): number {
+  checkLimit(limitDb);
+  const channel = measuredWith.detectedChannels.find((c) => c.commandId === subId);
+  if (!channel) throw new MeasuredCorrectionError(`The file you measured with has no channel ${subId}.`);
+  const { goal, current } = curvePair(target, channel);
+  return peakOf(correctedPoints(goal, current, trim, limitDb)) - Math.max(...current.gains);
+}
+
 /**
  * Returns a copy of `measuredWith` (the file the AVR was measured with; in
  * round 1 the target file itself) with a measured correction applied. Each
- * non-sub channel that has a trim gets, on the write grid,
- * target + clamp(measuredWith - target + trim, +/- limitDb): the correction
- * already in place plus this round's step, never further than the limit from
- * the target. Both curves are resampled by log-frequency interpolation.
- * Everything else (other channels' points, every trimAdjustment,
- * enTargetCurveType, all other fields) is copied from `measuredWith` as is.
- * Does not mutate the inputs. Throws MeasuredCorrectionError for a corrected
- * channel without a curve in either file, or a limit that is not positive.
+ * non-sub channel in `trims`, and each sub in `subTrims`, gets on the write
+ * grid target + clamp(measuredWith - target + trim, +/- limitDb): the
+ * correction already in place plus this round's step, never further than the
+ * limit from the target. A corrected sub's trimAdjustment moves by the change
+ * in its curve's peak (see subLevelShift), so its level stays where it was.
+ * Everything else is copied from `measuredWith` as is. Does not mutate the
+ * inputs. Throws MeasuredCorrectionError for a corrected channel without a
+ * curve in either file, or a limit that is not positive.
  */
 export function applyMeasuredCorrection(
   target: AdyFile,
   measuredWith: AdyFile,
   trims: ReadonlyMap<string, TrimFn>,
-  limitDb: number
+  limitDb: number,
+  subTrims: ReadonlyMap<string, TrimFn> = new Map()
 ): AdyFile {
-  if (!(Number.isFinite(limitDb) && limitDb > 0)) {
-    throw new MeasuredCorrectionError(`Limit must be a positive number of dB, got ${limitDb}`);
-  }
+  checkLimit(limitDb);
   const clone = JSON.parse(JSON.stringify(measuredWith)) as AdyFile;
-  const grid = frequencyGrid();
   for (const channel of clone.detectedChannels) {
-    if (isSubwooferChannel(channel)) continue;
-    const trim = trims.get(channel.commandId);
+    const sub = isSubwooferChannel(channel);
+    const trim = (sub ? subTrims : trims).get(channel.commandId);
     if (!trim) continue;
-    const targetChannel = target.detectedChannels.find((c) => c.commandId === channel.commandId);
-    const goal = targetChannel ? readCurvePoints(targetChannel) : { freqs: [], gains: [] };
-    if (goal.freqs.length === 0) {
-      throw new MeasuredCorrectionError(
-        `Channel ${channel.commandId} has no target curve. Design one on the Design page first.`
-      );
+    const { goal, current } = curvePair(target, channel);
+    const points = correctedPoints(goal, current, trim, limitDb);
+    if (sub) {
+      const shift = peakOf(points) - Math.max(...current.gains);
+      channel.trimAdjustment = (parseFloat(channel.trimAdjustment) + shift).toFixed(6);
     }
-    const current = readCurvePoints(channel);
-    if (current.freqs.length === 0) {
-      throw new MeasuredCorrectionError(`Channel ${channel.commandId} has no curve in the file you measured with.`);
-    }
-    channel.customTargetCurvePoints = grid.map((f) => {
-      const t = interpLogFreq(goal.freqs, goal.gains, f);
-      const soFar = interpLogFreq(current.freqs, current.gains, f) - t;
-      return formatPoint(f, t + clampTotal(soFar, trim(f), limitDb));
-    });
+    channel.customTargetCurvePoints = points;
   }
   return clone;
 }

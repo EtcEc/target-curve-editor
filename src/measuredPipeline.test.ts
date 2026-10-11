@@ -9,6 +9,7 @@ import { testParams } from './fixtures/testParams';
 import { measureCorrection } from './generate';
 import { interpLogFreq } from './logInterp';
 import { effectiveTarget, logGrid } from './measuredError';
+import { buildSubCorrections, subStep } from './subCorrection';
 
 function channel(ady: AdyFile, commandId: string): AdyChannel {
   const found = ady.detectedChannels.find((c) => c.commandId === commandId);
@@ -89,5 +90,59 @@ describe('multi-round correction', () => {
     const round2 = round(round1, 0.5);
     expect(gainAt(round2, 12000) - gainAt(round1, 12000)).toBeCloseTo(-0.75, 1);
     expect(gainAt(round2, 12000) - gainAt(designed, 12000)).toBeCloseTo(-2.25, 1);
+  });
+});
+
+describe('sub correction across rounds', () => {
+  const grid = logGrid();
+  /** FL and FR with the default design, SW1 too; both speakers crossed over at 80 Hz. */
+  function designedPair(): AdyFile {
+    const ady = applyCurveToAdy(createSampleAdy(), testParams());
+    const fl = channel(ady, 'FL');
+    fl.customCrossover = '80';
+    ady.detectedChannels.push({ ...JSON.parse(JSON.stringify(fl)), commandId: 'FR' });
+    return ady;
+  }
+  const designed = designedPair();
+  const target = effectiveTarget(channel(designed, 'FL'), 2);
+  /** A dip both speakers share in the bass: the sub's to fix. */
+  const dip = (f: number) => -2 * Math.exp(-(Math.log2(f / 40) ** 2) / (2 * 0.5 ** 2));
+  const files = (amount: number) => [
+    { name: 'm.txt', text: synthRewText((f) => 70 + interpLogFreq(grid, target, f) + amount * dip(f)) },
+  ];
+  const round = (measuredWith: AdyFile, amount: number) => {
+    const { correction } = measureCorrection(designed, measuredWith, [
+      { commandId: 'FL', files: files(amount) },
+      { commandId: 'FR', files: files(amount) },
+    ]);
+    const subs = buildSubCorrections(designed, measuredWith, correction);
+    return applyMeasuredCorrection(
+      designed,
+      measuredWith,
+      buildChannelTrims(correction, 0),
+      3,
+      new Map(subs.map((s) => [s.commandId, subStep(s, 0)]))
+    );
+  };
+  const gainAt = (ady: AdyFile, id: string, f: number) => {
+    const { freqs, gains } = readCurvePoints(channel(ady, id));
+    return gains[freqs.indexOf(f)];
+  };
+
+  it('round 1 lifts the sub where every speaker dips, and leaves it alone above its band', () => {
+    const round1 = round(designed, 1);
+    expect(gainAt(round1, 'SW1', 40) - gainAt(designed, 'SW1', 40)).toBeCloseTo(2, 0);
+    expect(gainAt(round1, 'SW1', 1000)).toBe(gainAt(designed, 'SW1', 1000));
+  });
+
+  it('round 2 changes neither the sub curve nor its trim once the measurement hits the target', () => {
+    const round1 = round(designed, 1);
+    const round2 = round(round1, 0);
+    const before = readCurvePoints(channel(round1, 'SW1')).gains;
+    const after = readCurvePoints(channel(round2, 'SW1')).gains;
+    let maxDiff = 0;
+    for (let i = 0; i < before.length; i++) maxDiff = Math.max(maxDiff, Math.abs(after[i] - before[i]));
+    expect(maxDiff).toBeLessThan(0.05);
+    expect(Math.abs(parseFloat(channel(round2, 'SW1').trimAdjustment) - parseFloat(channel(round1, 'SW1').trimAdjustment))).toBeLessThan(0.05);
   });
 });

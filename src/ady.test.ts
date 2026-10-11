@@ -157,7 +157,7 @@ describe('looksAlreadyProcessed', () => {
   });
 });
 
-import { MeasuredCorrectionError, applyMeasuredCorrection } from './ady';
+import { MeasuredCorrectionError, applyMeasuredCorrection, subLevelShift } from './ady';
 import type { TrimFn } from './curve';
 
 describe('applyMeasuredCorrection', () => {
@@ -286,5 +286,54 @@ describe('applyMeasuredCorrection', () => {
     const ady = constant(0);
     expect(() => applyMeasuredCorrection(ady, ady, new Map([['FL', trim]]), 0)).toThrow(/Limit/);
     expect(() => applyMeasuredCorrection(ady, ady, new Map([['FL', trim]]), NaN)).toThrow(/Limit/);
+  });
+
+  /** constant() with the sub's curve set too. */
+  function withSub(db: number, subCurve: (f: number) => number) {
+    const ady = constant(db);
+    byId(ady, 'SW1').customTargetCurvePoints = frequencyGrid().map((f) => `{${f.toFixed(1)}, ${subCurve(f).toFixed(3)}}`);
+    return ady;
+  }
+  const subGains = (ady: ReturnType<typeof constant>) => byId(ady, 'SW1').customTargetCurvePoints.map(gainOf);
+
+  it('writes the sub with its step and moves its trim by the change in its peak', () => {
+    const input = withSub(0, () => 0);
+    const result = applyMeasuredCorrection(input, input, new Map(), 3, new Map([['SW1', () => 0.5]]));
+    expect(subGains(result).every((g) => g === 0.5)).toBe(true);
+    // trim -1.25 plus a 0.5 dB higher peak
+    expect(byId(result, 'SW1').trimAdjustment).toBe('-0.750000');
+  });
+
+  it('leaves the sub trim alone when the step does not move the peak', () => {
+    const input = withSub(0, (f) => (f < 50 ? 4.5 : 0));
+    const result = applyMeasuredCorrection(input, input, new Map(), 3, new Map([['SW1', (f: number) => (f > 100 && f < 200 ? -1 : 0)]]));
+    expect(byId(result, 'SW1').trimAdjustment).toBe('-1.250000');
+    expect(gainOf(byId(result, 'SW1').customTargetCurvePoints.find((p) => p.startsWith('{150.0,'))!)).toBe(-1);
+  });
+
+  it('caps the sub at the limit from its target and builds on the measured-with sub', () => {
+    const result = applyMeasuredCorrection(withSub(0, () => 0), withSub(0, () => 2.5), new Map(), 3, new Map([['SW1', () => 1]]));
+    expect(subGains(result).every((g) => g === 3)).toBe(true);
+    // the peak goes from 2.5 to 3
+    expect(byId(result, 'SW1').trimAdjustment).toBe('-0.750000');
+  });
+
+  it('leaves the sub byte-identical without sub steps, and the speakers the same either way', () => {
+    const input = withSub(0, (f) => (f < 50 ? 4.5 : 0));
+    const without = applyMeasuredCorrection(input, input, new Map([['FL', () => 0.5]]), 3);
+    expect(byId(without, 'SW1')).toEqual(byId(input, 'SW1'));
+    const withSteps = applyMeasuredCorrection(input, input, new Map([['FL', () => 0.5]]), 3, new Map([['SW1', () => 1]]));
+    expect(byId(withSteps, 'FL')).toEqual(byId(without, 'FL'));
+  });
+
+  it('refuses a sub step for a sub with no curve in either file', () => {
+    const run = () => applyMeasuredCorrection(constant(0), constant(0), new Map(), 3, new Map([['SW1', () => 1]]));
+    expect(run).toThrow(/SW1 has no target curve/);
+  });
+
+  it('subLevelShift reports the trim change the download writes', () => {
+    const input = withSub(0, () => 0);
+    expect(subLevelShift(input, input, 'SW1', () => 0.5, 3)).toBeCloseTo(0.5, 9);
+    expect(subLevelShift(input, input, 'SW1', () => -0.25, 3)).toBeCloseTo(-0.25, 9);
   });
 });
