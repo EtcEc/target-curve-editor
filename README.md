@@ -16,13 +16,16 @@ The start page offers two jobs:
    to cancel it, and whether to compensate the sub trim. Save the design into
    compare slot A, B or C to see it drawn faintly while you keep editing, or save
    it as a small JSON file. Download the `.ady`.
-2. **Apply a measured correction.** Load a `.ady` this tool made, the one that
-   was on the AVR when you took REW measurements, and add the REW exports per
-   speaker. The page shows each speaker's current target, measurement and
-   corrected target, and downloads the file with the correction added on top of
-   its own curves (lined up and pinned at 1 kHz, fading in around the cutoff,
-   sub trim and channel levels untouched). Load the result on the AVR, measure
-   again and repeat to refine.
+2. **Apply a measured correction.** Load your target `.ady` (the one the Design
+   page made) and, from round 2 on, also the `.ady` that was on the AVR when you
+   took the REW measurements. Add the REW exports per speaker. The page compares
+   the measurements with your target and shows, per speaker, the target, the
+   measurement, the curve you measured with and the new curve. The download is
+   the measured-with file with each corrected curve set to your target plus the
+   correction so far plus this round's step (lined up and pinned at 1 kHz,
+   fading in around the cutoff, never more than the limit from your target; sub
+   trim and channel levels untouched). Load it on the AVR, measure again, and
+   repeat with it as the measured-with file.
 
 Design files are `{ "version": 1, "name", "bands", "cancelRolloff" }`. The HF
 rolloff type is not in them; it comes from the `.ady`.

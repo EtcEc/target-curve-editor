@@ -11,6 +11,7 @@ import {
   MAX_CUTOFF_HZ,
   MIN_CUTOFF_HZ,
   buildChannelTrims,
+  maxSoFar,
   summarizeCorrection,
   DEFAULT_TRIM_OPTIONS,
   DETAIL_STEPS,
@@ -21,7 +22,13 @@ import {
 } from '../correction';
 import { previewCurves } from '../correctionPreview';
 import { correctChecklist, measuredFilename } from '../downloadSummary';
-import { checkMeasuredType, measureCorrection, type MeasuredResult, type SpeakerInput } from '../generate';
+import {
+  checkFilePair,
+  checkMeasuredType,
+  measureCorrection,
+  type MeasuredResult,
+  type SpeakerInput,
+} from '../generate';
 import type { RolloffType } from '../rolloff';
 import { renderChecklist } from '../ui/checklist';
 import { bindFileNames, showFileName } from '../ui/filePick';
@@ -37,6 +44,11 @@ const dropzone = el<HTMLElement>('dropzone');
 const fileInput = el<HTMLInputElement>('file-input');
 const errorMessage = el<HTMLElement>('error-message');
 const fileInfo = el<HTMLElement>('file-info');
+const withDropzone = el<HTMLElement>('with-dropzone');
+const withInput = el<HTMLInputElement>('with-input');
+const withClear = el<HTMLButtonElement>('with-clear');
+const withError = el<HTMLElement>('with-error');
+const pairError = el<HTMLElement>('pair-error');
 const measurePlaceholder = el<HTMLElement>('measure-placeholder');
 const measureStep = el<HTMLElement>('measure-step');
 const speakerRows = el<HTMLElement>('speaker-rows');
@@ -59,12 +71,22 @@ const downloadSection = el<HTMLElement>('download-section');
 const downloadSummary = el<HTMLElement>('download-summary');
 const downloadButton = el<HTMLButtonElement>('download');
 
-let ady: AdyFile | null = null;
+/** The target file: what the measurements are compared with. */
+let target: AdyFile | null = null;
+/** The file the AVR was measured with, from round 2 on; null means the target itself. */
+let measuredWith: AdyFile | null = null;
+let measuredWithName = '';
 let rolloffType: RolloffType = 2;
+/** True when a target is loaded and it fits the measured-with file. */
+let paired = false;
 let result: MeasuredResult | null = null;
 let cutoffHz = DEFAULT_CUTOFF_HZ;
 let chart: ReturnType<typeof createPreviewChart> | null = null;
-/** Bumped on every change of inputs, so a slow file read can't overwrite a newer result. */
+/** REW files picked per speaker; kept when either .ady is replaced. */
+const chosen = new Map<string, File[]>();
+/** Each bumped on a new request, so a slow read can't overwrite a newer one. */
+let targetLoads = 0;
+let withLoads = 0;
 let generation = 0;
 /** Detail, strength and limit, as set by the sliders. */
 const trimOptions: TrimOptions = { ...DEFAULT_TRIM_OPTIONS };
@@ -85,6 +107,11 @@ limitInput.min = String(MIN_LIMIT_DB);
 limitInput.max = String(MAX_LIMIT_DB);
 limitInput.step = '0.5';
 limitInput.value = String(DEFAULT_TRIM_OPTIONS.limitDb);
+
+/** The file the AVR was measured with: the second file, or the target in round 1. */
+function base(): AdyFile | null {
+  return measuredWith ?? target;
+}
 
 /** Reads the three sliders into `trimOptions` and shows their values. */
 function readSettings(): void {
@@ -108,66 +135,126 @@ function cell(text: string): HTMLTableCellElement {
   return td;
 }
 
-async function loadFile(file: File): Promise<void> {
-  showFileName('file-input', file.name);
-  const mine = ++generation;
+/** Reads and validates a .ady (structure and a supported rolloff type); errors carry a message for the page. */
+async function readAdy(file: File): Promise<AdyFile> {
   let text: string;
   try {
     text = await file.text();
   } catch (err) {
-    if (mine !== generation) return;
-    ady = null;
-    result = null;
-    show(fileInfo, null);
-    show(errorMessage, `Could not read file: ${(err as Error).message}`);
-    show(measureError, null);
-    buildRows();
-    render();
-    return;
+    throw new Error(`Could not read file: ${(err as Error).message}`);
   }
-  if (mine !== generation) return;
-  result = null;
   try {
     const parsed = parseAdy(text);
-    rolloffType = checkMeasuredType(parsed);
+    checkMeasuredType(parsed);
+    return parsed;
+  } catch (err) {
+    throw err instanceof AdyValidationError ? new Error(`Not a valid .ady file: ${err.message}`) : err;
+  }
+}
+
+async function loadTarget(file: File): Promise<void> {
+  showFileName('file-input', file.name);
+  const mine = ++targetLoads;
+  try {
+    const parsed = await readAdy(file);
+    if (mine !== targetLoads) return;
     const speakers = parsed.detectedChannels.filter((c) => !isSubwooferChannel(c));
     if (!speakers.some((c) => c.customTargetCurvePoints.length > 0)) {
       throw new Error('This file has no target curves. Design one on the Design page first.');
     }
-    ady = parsed;
+    target = parsed;
     show(errorMessage, null);
-    show(fileInfo, `${speakers.length} speakers · High Frequency Roll Off ${rolloffType}`);
+    show(fileInfo, `${speakers.length} speakers · High Frequency Roll Off ${parsed.enTargetCurveType}`);
   } catch (err) {
-    ady = null;
+    if (mine !== targetLoads) return;
+    target = null;
     show(fileInfo, null);
-    show(
-      errorMessage,
-      err instanceof AdyValidationError ? `Not a valid .ady file: ${err.message}` : (err as Error).message
-    );
+    show(errorMessage, (err as Error).message);
+  }
+  refresh();
+}
+
+async function loadMeasuredWith(file: File): Promise<void> {
+  showFileName('with-input', file.name);
+  const mine = ++withLoads;
+  try {
+    const parsed = await readAdy(file);
+    if (mine !== withLoads) return;
+    measuredWith = parsed;
+    measuredWithName = file.name;
+    show(withError, null);
+  } catch (err) {
+    if (mine !== withLoads) return;
+    measuredWith = null;
+    measuredWithName = '';
+    show(withError, (err as Error).message);
+  }
+  withClear.hidden = false;
+  refresh();
+}
+
+function clearMeasuredWith(): void {
+  withLoads++;
+  measuredWith = null;
+  measuredWithName = '';
+  withInput.value = '';
+  showFileName('with-input', 'No file chosen');
+  show(withError, null);
+  withClear.hidden = true;
+  refresh();
+}
+
+/** Re-checks the file pair, rebuilds the speaker rows and measures again with the files already picked. */
+function refresh(): void {
+  result = null;
+  paired = false;
+  show(pairError, null);
+  const other = base();
+  if (target && other) {
+    try {
+      rolloffType = checkFilePair(target, other);
+      paired = true;
+    } catch (err) {
+      show(pairError, (err as Error).message);
+    }
   }
   show(measureError, null);
   buildRows();
   render();
+  void recompute();
+}
+
+function note(text: string): HTMLSpanElement {
+  const span = document.createElement('span');
+  span.className = 'hint';
+  span.textContent = text;
+  return span;
+}
+
+function filesLabel(files: readonly File[]): string {
+  return files.length === 0 ? 'No files' : files.length === 1 ? files[0].name : `${files.length} files`;
 }
 
 /** One row per speaker with a multi-file input for its REW exports. */
 function buildRows(): void {
   speakerRows.replaceChildren();
-  if (!ady) return;
-  for (const channel of ady.detectedChannels) {
+  const other = base();
+  if (!target || !other || !paired) return;
+  for (const channel of target.detectedChannels) {
     if (isSubwooferChannel(channel)) continue;
+    const id = channel.commandId;
     const row = document.createElement('div');
     row.className = 'gen-row';
     const name = document.createElement('span');
     name.className = 'channel-name';
-    name.textContent = channel.commandId;
+    name.textContent = id;
     row.appendChild(name);
 
+    const withChannel = other.detectedChannels.find((c) => c.commandId === id);
     if (channel.customTargetCurvePoints.length === 0) {
-      const note = document.createElement('span');
-      note.className = 'hint';
-      note.textContent = 'No target curve in this file, so it is left unchanged.';
-      row.appendChild(note);
+      row.appendChild(note('No target curve in this file, so it is left unchanged.'));
+    } else if (!withChannel || withChannel.customTargetCurvePoints.length === 0) {
+      row.appendChild(note('No curve in the file you measured with, so it is left unchanged.'));
     } else {
       const pick = document.createElement('label');
       pick.className = 'file-pick';
@@ -176,58 +263,53 @@ function buildRows(): void {
       input.multiple = true;
       input.accept = '.txt,.csv,.tsv,text/plain,text/csv';
       input.className = 'visually-hidden';
-      input.dataset.channel = channel.commandId;
+      input.dataset.channel = id;
       const choose = document.createElement('span');
       choose.className = 'button ghost small';
       choose.textContent = 'Choose files…';
-      const chosen = document.createElement('span');
-      chosen.className = 'file-name';
-      chosen.textContent = 'No files';
+      const label = document.createElement('span');
+      label.className = 'file-name';
+      label.textContent = filesLabel(chosen.get(id) ?? []);
       input.addEventListener('change', () => {
         const files = Array.from(input.files ?? []);
-        chosen.textContent =
-          files.length === 0 ? 'No files' : files.length === 1 ? files[0].name : `${files.length} files`;
+        if (files.length === 0) chosen.delete(id);
+        else chosen.set(id, files);
+        label.textContent = filesLabel(files);
         void recompute();
       });
-      pick.append(input, choose, chosen);
+      pick.append(input, choose, label);
       row.appendChild(pick);
     }
     speakerRows.appendChild(row);
   }
 }
 
-/** Reads every chosen REW file and measures the correction. */
+/** Reads every picked REW file for the speakers on show and measures the correction. */
 async function recompute(): Promise<void> {
-  const current = ady;
-  if (!current) return;
   const mine = ++generation;
+  const goal = target;
+  const other = base();
+  if (!goal || !other || !paired) return;
   const speakers: SpeakerInput[] = [];
   try {
     for (const input of speakerRows.querySelectorAll<HTMLInputElement>('input[type="file"]')) {
-      const files = Array.from(input.files ?? []);
+      const commandId = input.dataset.channel as string;
+      const files = chosen.get(commandId) ?? [];
       if (files.length === 0) continue;
       speakers.push({
-        commandId: input.dataset.channel as string,
+        commandId,
         files: await Promise.all(files.map(async (f) => ({ name: f.name, text: await f.text() }))),
       });
     }
     if (mine !== generation) return;
-    if (speakers.length === 0) {
-      result = null;
-      show(measureError, null);
-    } else {
-      result = measureCorrection(current, current, speakers);
-      show(measureError, null);
-    }
+    result = speakers.length === 0 ? null : measureCorrection(goal, other, speakers);
+    show(measureError, null);
   } catch (err) {
-    if (mine === generation) {
-      result = null;
-      show(measureError, (err as Error).message);
-    }
+    if (mine !== generation) return;
+    result = null;
+    show(measureError, (err as Error).message);
   }
-  if (mine === generation) {
-    render();
-  }
+  render();
 }
 
 function renderTable(): void {
@@ -237,15 +319,16 @@ function renderTable(): void {
     show(measureWarnings, null);
     return;
   }
-  const trims = summarizeCorrection(result.correction, cutoffHz, trimOptions);
+  const rows = summarizeCorrection(result.correction, cutoffHz, trimOptions);
   for (const report of result.reports) {
-    const largest = trims.find((t) => t.commandId === report.commandId)?.maxThisRound ?? 0;
+    const row = rows.find((r) => r.commandId === report.commandId);
     const tr = document.createElement('tr');
     tr.append(
       cell(report.commandId),
       cell(String(report.positions)),
       cell(report.rmsError.toFixed(2)),
-      cell(largest.toFixed(2))
+      cell((row?.maxThisRound ?? 0).toFixed(2)),
+      cell((row?.maxTotal ?? 0).toFixed(2))
     );
     correctionBody.appendChild(tr);
   }
@@ -254,7 +337,7 @@ function renderTable(): void {
 }
 
 function renderPreview(): void {
-  if (!ady) return;
+  if (!target || !paired) return;
   if (!chart) chart = createPreviewChart(previewContainer);
   const ids = result ? Object.keys(result.correction) : [];
   const keep = ids.includes(previewChannel.value) ? previewChannel.value : ids[0];
@@ -268,24 +351,38 @@ function renderPreview(): void {
   );
   previewChannel.disabled = ids.length === 0;
   previewHint.hidden = ids.length > 0;
-  const channel = keep ? ady.detectedChannels.find((c) => c.commandId === keep) : undefined;
+  const channel = keep ? target.detectedChannels.find((c) => c.commandId === keep) : undefined;
   if (!result || !keep || !channel) {
-    updatePreviewChart(chart, null, false);
+    updatePreviewChart(chart, null, measuredWith !== null);
     return;
   }
   previewChannel.value = keep;
-  updatePreviewChart(chart, previewCurves(channel, rolloffType, result.correction[keep], cutoffHz, trimOptions), false);
+  updatePreviewChart(
+    chart,
+    previewCurves(channel, rolloffType, result.correction[keep], cutoffHz, trimOptions),
+    measuredWith !== null
+  );
 }
 
 function render(): void {
-  measureStep.hidden = ady === null;
-  measurePlaceholder.hidden = ady !== null;
-  const ready = ady !== null && result !== null;
+  measureStep.hidden = !paired;
+  measurePlaceholder.hidden = paired;
+  const ready = paired && result !== null;
   downloadSection.hidden = !ready;
   downloadPlaceholder.hidden = ready;
   renderTable();
   renderPreview();
-  if (result) renderChecklist(downloadSummary, correctChecklist(Object.keys(result.correction), cutoffHz, trimOptions));
+  if (result) {
+    renderChecklist(
+      downloadSummary,
+      correctChecklist(
+        Object.keys(result.correction),
+        cutoffHz,
+        trimOptions,
+        measuredWith ? { name: measuredWithName, soFarDb: maxSoFar(result.correction) } : undefined
+      )
+    );
+  }
 }
 
 function cutoffValid(): boolean {
@@ -315,37 +412,43 @@ for (const input of [detailInput, strengthInput, limitInput]) {
   });
 }
 
-fileInput.addEventListener('change', () => {
-  const file = fileInput.files?.[0];
-  if (file) void loadFile(file);
-});
+/** Wires a drop zone and its file input to `load`. */
+function bindDropzone(zone: HTMLElement, input: HTMLInputElement, load: (file: File) => Promise<void>): void {
+  input.addEventListener('change', () => {
+    const file = input.files?.[0];
+    if (file) void load(file);
+  });
+  zone.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    zone.classList.add('dragover');
+  });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', (event) => {
+    event.preventDefault();
+    zone.classList.remove('dragover');
+    const file = event.dataTransfer?.files?.[0];
+    if (file) void load(file);
+  });
+}
 
-dropzone.addEventListener('dragover', (event) => {
-  event.preventDefault();
-  dropzone.classList.add('dragover');
-});
-
-dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
-
-dropzone.addEventListener('drop', (event) => {
-  event.preventDefault();
-  dropzone.classList.remove('dragover');
-  const file = event.dataTransfer?.files?.[0];
-  if (file) void loadFile(file);
-});
+bindDropzone(dropzone, fileInput, loadTarget);
+bindDropzone(withDropzone, withInput, loadMeasuredWith);
+withClear.addEventListener('click', clearMeasuredWith);
 
 downloadButton.addEventListener('click', () => {
-  if (!ady || !result) return;
+  const goal = target;
+  const other = base();
+  if (!goal || !other || !paired || !result) return;
   const corrected = applyMeasuredCorrection(
-    ady,
-    ady,
+    goal,
+    other,
     buildChannelTrims(result.correction, cutoffHz, trimOptions),
     trimOptions.limitDb
   );
   const url = URL.createObjectURL(new Blob([serializeAdy(corrected)], { type: 'application/json' }));
   const a = document.createElement('a');
   a.href = url;
-  a.download = measuredFilename(ady.title, cutoffHz);
+  a.download = measuredFilename(other.title, cutoffHz);
   a.click();
   URL.revokeObjectURL(url);
 });

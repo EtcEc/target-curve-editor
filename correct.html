@@ -14,11 +14,9 @@
       </header>
 
       <section class="card">
-        <h2 class="step-title"><span class="step-num">1</span> Load your .ady</h2>
-        <p class="hint">
-          The .ady this tool made, as loaded on the AVR when you took the REW sweeps. Its curves are what the
-          measurements are compared with, and it is the file the download edits.
-        </p>
+        <h2 class="step-title"><span class="step-num">1</span> Load your files</h2>
+        <h3 class="card-title">Your target .ady</h3>
+        <p class="hint">The file from the Design page. Its curves are what the measurements are compared with.</p>
         <div id="dropzone" class="dropzone">
           <p>Drop a .ady file here, or</p>
           <label class="file-pick">
@@ -29,9 +27,26 @@
         </div>
         <p id="error-message" class="error" hidden></p>
         <p id="file-info" class="hint" hidden></p>
+
+        <h3 class="card-title">The .ady you measured with</h3>
+        <p class="hint">
+          The file that was on the AVR for these measurements. Leave empty in round 1, when that was the target file
+          itself. From round 2 on, load the file the previous round downloaded: the new correction is added to it.
+        </p>
+        <div id="with-dropzone" class="dropzone">
+          <p>Drop a .ady file here, or</p>
+          <label class="file-pick">
+            <input type="file" id="with-input" accept=".ady" class="visually-hidden" />
+            <span class="button ghost">Choose .ady…</span>
+            <span class="file-name" data-for="with-input">No file chosen</span>
+          </label>
+          <button type="button" id="with-clear" class="ghost small" hidden>Clear</button>
+        </div>
+        <p id="with-error" class="error" hidden></p>
+        <p id="pair-error" class="error" hidden></p>
       </section>
 
-      <p id="measure-placeholder" class="placeholder">2 · Add measurements: load a .ady first.</p>
+      <p id="measure-placeholder" class="placeholder">2 · Add measurements: load your target .ady first.</p>
       <section id="measure-step" class="step" hidden>
         <h2 class="step-title"><span class="step-num">2</span> Add measurements</h2>
         <div class="workbench">
@@ -82,7 +97,7 @@
               <p class="hint">
                 Detail is how wide an area the measured error is averaged over: small values follow narrower
                 features, large values correct only broad trends. Strength is how much of the error is corrected.
-                Limit caps every cut and boost.
+                Limit caps how far each curve may end up from your target, over all rounds.
               </p>
               <table id="correction-table" hidden>
                 <thead>
@@ -90,7 +105,8 @@
                     <th>Channel</th>
                     <th>Positions</th>
                     <th>Error RMS 2–20 kHz (dB)</th>
-                    <th>Largest trim (dB)</th>
+                    <th>This round (dB)</th>
+                    <th>Total (dB)</th>
                   </tr>
                 </thead>
                 <tbody></tbody>
