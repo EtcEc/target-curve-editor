@@ -50,6 +50,15 @@ export function commonError(correction: Correction): number[] {
   return errors[0].map((_, i) => errors.reduce((sum, e) => sum + e[i], 0) / errors.length);
 }
 
+/**
+ * A speaker set to Large in MultEQ-X (customSpeakerType "L") plays its own
+ * bass, so its sweeps say little about the sub. Speakers with no type count
+ * as Small.
+ */
+export function isLargeSpeaker(channel: AdyChannel): boolean {
+  return channel.customSpeakerType === 'L';
+}
+
 /** Both channels' written curves on the log grid, or null when either can't be read (the sub is then left alone). */
 function readableCurves(target: AdyChannel, measuredWith: AdyChannel): [number[], number[]] | null {
   try {
@@ -62,16 +71,19 @@ function readableCurves(target: AdyChannel, measuredWith: AdyChannel): [number[]
 
 /**
  * One SubCorrection per sub channel with a readable curve in both files, all sharing
- * the speakers' common error. Empty when no speaker was measured.
+ * the common error of the measured speakers that aren't Large. Empty when there are none.
  */
 export function buildSubCorrections(
   target: AdyFile,
   measuredWith: AdyFile,
   correction: Correction
 ): SubCorrection[] {
-  const speakers = Object.keys(correction);
+  const speakers = Object.keys(correction).filter((id) => {
+    const channel = target.detectedChannels.find((c) => c.commandId === id);
+    return !channel || !isLargeSpeaker(channel);
+  });
   if (speakers.length === 0) return [];
-  const error = commonError(correction);
+  const error = commonError(Object.fromEntries(speakers.map((id) => [id, correction[id]])));
   const crossover = crossoverHz(target, speakers);
   const subs: SubCorrection[] = [];
   for (const channel of target.detectedChannels) {

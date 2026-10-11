@@ -29,7 +29,8 @@ The start page offers two jobs:
    The sub is corrected too ("Correct the sub", on by default): what every
    measured speaker has in common in the bass is the sub playing, so that part
    goes to the sub, below about twice the crossover, while each speaker gets
-   its own error. The sub's trim moves with its curve's peak so its level stays
+   its own error. Speakers set to Large play their own bass and are left out of
+   the sub's share. The sub's trim moves with its curve's peak so its level stays
    where it was. The cutoff defaults to 0 (full range); set it higher to leave
    everything below it alone.
 

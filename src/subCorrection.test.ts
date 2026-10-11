@@ -91,6 +91,23 @@ describe('buildSubCorrections', () => {
     expect(sub.soFar[grid.findIndex((f) => f >= 1000)]).toBeCloseTo(0, 6);
   });
 
+  it('leaves Large speakers out of the common error, the speaker count and the crossover', () => {
+    const target = ady();
+    target.detectedChannels[2].customSpeakerType = 'L';
+    target.detectedChannels[2].customCrossover = '120';
+    const [sub] = buildSubCorrections(target, target, correction);
+    expect(sub.fromSpeakers).toBe(1);
+    expect(sub.error).toEqual(correction.FL.error);
+    expect(sub.crossoverHz).toBe(80);
+  });
+
+  it('gives the sub nothing when every measured speaker is Large', () => {
+    const target = ady();
+    target.detectedChannels[0].customSpeakerType = 'L';
+    target.detectedChannels[2].customSpeakerType = 'L';
+    expect(buildSubCorrections(target, target, correction)).toEqual([]);
+  });
+
   it('skips a sub whose curve points cannot be read', () => {
     const broken = ady();
     broken.detectedChannels[1].customTargetCurvePoints = ['{nonsense}'];

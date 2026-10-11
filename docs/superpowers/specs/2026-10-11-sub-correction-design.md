@@ -156,3 +156,7 @@ Test-first, synthetic data only.
 
 - The sub's checklist line starts with its channel id ("SW1: common correction from 5 speakers, …") rather than "Sub:", so two subs can be told apart.
 - With a cutoff of 0 the "Unchanged below the fade; …" line becomes "Each curve keeps its level at 1 kHz" instead of being left out, so the 1 kHz note stays.
+
+## Later change (2026-10-11): Large speakers
+
+A speaker set to Large (`customSpeakerType` "L") plays its own bass, so it is left out of the common error, the "from N speakers" count and the crossover. Speakers with no type count as Small. If every measured speaker is Large, the sub gets no correction. (`customCrossover` was not used to detect this: some files carry values such as "10" that are not real crossover settings.)
