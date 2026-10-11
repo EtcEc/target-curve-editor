@@ -151,3 +151,8 @@ Test-first, synthetic data only.
   because their bass goes to the sub.
 - Changing delays, distances or crossovers.
 - Correcting the sub's level, as opposed to its shape.
+
+## Notes from planning
+
+- The sub's checklist line starts with its channel id ("SW1: common correction from 5 speakers, …") rather than "Sub:", so two subs can be told apart.
+- With a cutoff of 0 the "Unchanged below the fade; …" line becomes "Each curve keeps its level at 1 kHz" instead of being left out, so the 1 kHz note stays.

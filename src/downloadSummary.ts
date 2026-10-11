@@ -60,24 +60,46 @@ export function buildFilenameSuffix(params: CurveParams): string {
   return (params.cancelRolloff ? '' : '_no-knee-cancel') + (params.subTrim ? '' : '_no-sub-trim');
 }
 
-/** What the Correct page's download will contain. `measuredWith` is set from round 2 on. */
+/** One corrected sub, for the Correct page's checklist. */
+export interface SubChecklistEntry {
+  commandId: string;
+  fromSpeakers: number;
+  /** How much its trimAdjustment moves (dB). */
+  levelDb: number;
+}
+
+/** "+0.40", "-0.12"; anything that rounds to zero is "+0.00". */
+function signedLevel(db: number): string {
+  const rounded = Math.abs(db) < 0.005 ? 0 : db;
+  return `${rounded >= 0 ? '+' : ''}${rounded.toFixed(2)}`;
+}
+
+/**
+ * What the Correct page's download will contain. `measuredWith` is set from
+ * round 2 on; `subs` lists the subs that get the common correction.
+ */
 export function correctChecklist(
   channels: readonly string[],
   cutoffHz: number,
   options: TrimOptions = DEFAULT_TRIM_OPTIONS,
-  measuredWith?: { name: string; soFarDb: number }
+  measuredWith?: { name: string; soFarDb: number },
+  subs: readonly SubChecklistEntry[] = []
 ): ChecklistItem[] {
-  const lo = Math.round(cutoffHz / Math.SQRT2);
-  const hi = Math.round(cutoffHz * Math.SQRT2);
-  const items: ChecklistItem[] = [
-    {
-      text: `Measured correction on ${channels.join(', ')}, fading in from ${lo} Hz to ${hi} Hz (cutoff ${cutoffHz} Hz)`,
-      on: true,
-    },
-  ];
+  const fade =
+    cutoffHz === 0
+      ? ' over the full range'
+      : `, fading in from ${Math.round(cutoffHz / Math.SQRT2)} Hz to ${Math.round(cutoffHz * Math.SQRT2)} Hz (cutoff ${cutoffHz} Hz)`;
+  const items: ChecklistItem[] = [{ text: `Measured correction on ${channels.join(', ')}${fade}`, on: true }];
   if (measuredWith) {
     items.push({
       text: `Measured with: ${measuredWith.name} (correction so far up to ${measuredWith.soFarDb.toFixed(1)} dB)`,
+      on: true,
+    });
+  }
+  for (const sub of subs) {
+    const speakers = `${sub.fromSpeakers} speaker${sub.fromSpeakers === 1 ? '' : 's'}`;
+    items.push({
+      text: `${sub.commandId}: common correction from ${speakers}, level ${signedLevel(sub.levelDb)} dB to keep it where it was`,
       on: true,
     });
   }
@@ -86,8 +108,20 @@ export function correctChecklist(
       text: `Detail ${formatOctaves(options.detailOctaves)} oct · strength ${Math.round(options.strength * 100)}% · limit ±${options.limitDb} dB`,
       on: true,
     },
-    { text: 'Unchanged below the fade; each curve keeps its level at 1 kHz', on: true },
-    { text: 'Sub, channel levels and HF rolloff unchanged', on: true }
+    {
+      text:
+        cutoffHz === 0
+          ? 'Each curve keeps its level at 1 kHz'
+          : 'Unchanged below the fade; each curve keeps its level at 1 kHz',
+      on: true,
+    },
+    {
+      text:
+        subs.length > 0
+          ? 'Other channel levels and HF rolloff unchanged'
+          : 'Sub, channel levels and HF rolloff unchanged',
+      on: true,
+    }
   );
   return items;
 }

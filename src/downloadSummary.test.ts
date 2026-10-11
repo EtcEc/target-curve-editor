@@ -94,6 +94,37 @@ describe('correctChecklist', () => {
     });
     expect(items).toHaveLength(5);
   });
+
+  it('says "over the full range" and keeps the 1 kHz note with a cutoff of 0', () => {
+    expect(correctChecklist(['FL', 'FR'], 0).map((i) => i.text)).toEqual([
+      'Measured correction on FL, FR over the full range',
+      'Detail 1 oct · strength 100% · limit ±3 dB',
+      'Each curve keeps its level at 1 kHz',
+      'Sub, channel levels and HF rolloff unchanged',
+    ]);
+  });
+
+  it('adds a line per corrected sub and says the other levels are unchanged', () => {
+    const items = correctChecklist(['FL', 'FR'], 0, DEFAULT_TRIM_OPTIONS, undefined, [
+      { commandId: 'SW1', fromSpeakers: 5, levelDb: 0.4 },
+      { commandId: 'SW2', fromSpeakers: 1, levelDb: -0.123 },
+    ]);
+    expect(items.map((i) => i.text)).toEqual([
+      'Measured correction on FL, FR over the full range',
+      'SW1: common correction from 5 speakers, level +0.40 dB to keep it where it was',
+      'SW2: common correction from 1 speaker, level -0.12 dB to keep it where it was',
+      'Detail 1 oct · strength 100% · limit ±3 dB',
+      'Each curve keeps its level at 1 kHz',
+      'Other channel levels and HF rolloff unchanged',
+    ]);
+  });
+
+  it('shows a level change that rounds to zero as +0.00', () => {
+    const items = correctChecklist(['FL'], 0, DEFAULT_TRIM_OPTIONS, undefined, [
+      { commandId: 'SW1', fromSpeakers: 1, levelDb: -0.001 },
+    ]);
+    expect(items[1].text).toBe('SW1: common correction from 1 speaker, level +0.00 dB to keep it where it was');
+  });
 });
 
 describe('measuredFilename', () => {

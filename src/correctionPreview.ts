@@ -8,6 +8,8 @@ import {
 } from './correction';
 import { effectiveTarget, logGrid } from './measuredError';
 import type { RolloffType } from './rolloff';
+import type { TrimFn } from './curve';
+import { subStep, type SubCorrection } from './subCorrection';
 
 export interface PreviewCurves {
   freq: number[];
@@ -21,7 +23,26 @@ export interface PreviewCurves {
   corrected: number[];
 }
 
-/** The Correct page chart's lines for one channel (`channel` is the target file's), all lined up at 1 kHz. */
+function curvesFor(
+  channel: AdyChannel,
+  rolloffType: RolloffType,
+  error: readonly number[],
+  soFar: readonly number[],
+  step: TrimFn,
+  limitDb: number
+): PreviewCurves {
+  const freq = logGrid();
+  const target = effectiveTarget(channel, rolloffType);
+  return {
+    freq,
+    target,
+    measured: target.map((v, i) => v + error[i]),
+    measuredWith: target.map((v, i) => v + soFar[i]),
+    corrected: target.map((v, i) => v + clampTotal(soFar[i], step(freq[i]), limitDb)),
+  };
+}
+
+/** The Correct page chart's lines for one speaker (`channel` is the target file's), all lined up at 1 kHz. */
 export function previewCurves(
   channel: AdyChannel,
   rolloffType: RolloffType,
@@ -29,14 +50,17 @@ export function previewCurves(
   cutoffHz: number,
   options: TrimOptions = DEFAULT_TRIM_OPTIONS
 ): PreviewCurves {
-  const freq = logGrid();
-  const target = effectiveTarget(channel, rolloffType);
-  const trim = trimFromError(correction.error, freq, cutoffHz, options);
-  return {
-    freq,
-    target,
-    measured: target.map((v, i) => v + correction.error[i]),
-    measuredWith: target.map((v, i) => v + correction.soFar[i]),
-    corrected: target.map((v, i) => v + clampTotal(correction.soFar[i], trim(freq[i]), options.limitDb)),
-  };
+  const step = trimFromError(correction.error, logGrid(), cutoffHz, options);
+  return curvesFor(channel, rolloffType, correction.error, correction.soFar, step, options.limitDb);
+}
+
+/** The same lines for a sub: "measured" is its target plus the speakers' common error. */
+export function subPreviewCurves(
+  channel: AdyChannel,
+  rolloffType: RolloffType,
+  sub: SubCorrection,
+  cutoffHz: number,
+  options: TrimOptions = DEFAULT_TRIM_OPTIONS
+): PreviewCurves {
+  return curvesFor(channel, rolloffType, sub.error, sub.soFar, subStep(sub, cutoffHz, options), options.limitDb);
 }
