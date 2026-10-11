@@ -4,6 +4,7 @@ import {
   MAX_CUTOFF_HZ,
   MIN_CUTOFF_HZ,
   buildChannelTrims,
+  clampTotal,
   summarizeCorrection,
   trimFromError,
   DEFAULT_TRIM_OPTIONS,
@@ -186,5 +187,15 @@ describe('trim options', () => {
 
   it('formats detail widths as short fractions', () => {
     expect(DETAIL_STEPS.map(formatOctaves)).toEqual(['⅓', '½', '⅔', '1', '1½', '2', '3']);
+  });
+});
+
+describe('clampTotal', () => {
+  it('adds the step to the correction so far and caps the total at the limit', () => {
+    expect(clampTotal(0, 1.25, 3)).toBe(1.25);
+    expect(clampTotal(2.5, 1, 3)).toBe(3);
+    expect(clampTotal(-2.5, -1, 3)).toBe(-3);
+    expect(clampTotal(2.5, 0, 2)).toBe(2);
+    expect(clampTotal(2.5, -1, 3)).toBe(1.5);
   });
 });

@@ -134,7 +134,7 @@ Test-first, synthetic data only (the repo is public).
   `applyMeasuredCorrection` output for the same inputs.
 - Round 2 with the bias fixed: a target T and a bias S give round 1's output C1.
   A round-2 measurement equal to T + R then leaves every point of the output
-  equal to C1 (within 0.001 dB).
+  within 0.05 dB of C1 (the synthetic measurement is smoothed at 1/6 octave, as in the existing pipeline test).
 - Half-fixed bias: a round-2 measurement with S/2 remaining moves the output
   by S/2 further, within the limit.
 - Limit caps the total: with D already at +2.5 dB and a step of +1 dB at

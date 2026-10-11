@@ -180,7 +180,7 @@ describe('applyMeasuredCorrection', () => {
 
   it('adds the trim to each point of a channel on the write grid', () => {
     const input = designed();
-    const result = applyMeasuredCorrection(input, new Map([['FL', trim]]));
+    const result = applyMeasuredCorrection(input, input, new Map([['FL', trim]]), 3);
     const before = byId(input, 'FL').customTargetCurvePoints;
     const after = byId(result, 'FL').customTargetCurvePoints;
     const grid = frequencyGrid();
@@ -193,7 +193,7 @@ describe('applyMeasuredCorrection', () => {
   it('leaves untrimmed channels, the sub, every trimAdjustment and enTargetCurveType untouched', () => {
     const input = designed();
     input.enTargetCurveType = 1;
-    const result = applyMeasuredCorrection(input, new Map([['FL', trim], ['SW1', trim]]));
+    const result = applyMeasuredCorrection(input, input, new Map([['FL', trim], ['SW1', trim]]), 3);
     expect(byId(result, 'FR')).toEqual(byId(input, 'FR'));
     expect(byId(result, 'SW1')).toEqual(byId(input, 'SW1'));
     expect(byId(result, 'FL').trimAdjustment).toBe(byId(input, 'FL').trimAdjustment);
@@ -204,7 +204,7 @@ describe('applyMeasuredCorrection', () => {
   it('resamples a curve that is not on the write grid onto it', () => {
     const ady = createSampleAdy();
     ady.detectedChannels[0].customTargetCurvePoints = ['{20.0, 2.000}', '{1000.0, 0.000}', '{20000.0, -2.000}'];
-    const points = applyMeasuredCorrection(ady, new Map([['FL', () => 0.5]])).detectedChannels[0]
+    const points = applyMeasuredCorrection(ady, ady, new Map([['FL', () => 0.5]]), 3).detectedChannels[0]
       .customTargetCurvePoints;
     expect(points).toHaveLength(frequencyGrid().length);
     expect(points[0]).toBe('{20.0, 2.500}');
@@ -215,25 +215,76 @@ describe('applyMeasuredCorrection', () => {
   });
 
   it('refuses a trimmed channel that has no target curve', () => {
-    const run = () => applyMeasuredCorrection(createSampleAdy(), new Map([['FL', trim]]));
+    const sample = createSampleAdy();
+    const run = () => applyMeasuredCorrection(sample, sample, new Map([['FL', trim]]), 3);
     expect(run).toThrow(MeasuredCorrectionError);
     expect(run).toThrow(/FL has no target curve/);
   });
 
   it('ignores a trim for a channel the file does not have', () => {
     const input = designed();
-    expect(applyMeasuredCorrection(input, new Map([['XX', trim]]))).toEqual(input);
+    expect(applyMeasuredCorrection(input, input, new Map([['XX', trim]]), 3)).toEqual(input);
   });
 
   it('changes nothing on a pass with a zero trim', () => {
     const input = designed();
-    expect(applyMeasuredCorrection(input, new Map([['FL', () => 0], ['FR', () => 0]]))).toEqual(input);
+    expect(applyMeasuredCorrection(input, input, new Map([['FL', () => 0], ['FR', () => 0]]), 3)).toEqual(input);
   });
 
   it('does not mutate the input', () => {
     const input = designed();
     const snapshot = JSON.stringify(input);
-    applyMeasuredCorrection(input, new Map([['FL', trim]]));
+    applyMeasuredCorrection(input, input, new Map([['FL', trim]]), 3);
     expect(JSON.stringify(input)).toBe(snapshot);
+  });
+
+  /** createSampleAdy() with every non-sub channel's curve at a constant `db` on the write grid. */
+  function constant(db: number, title = 'Sample') {
+    const ady = createSampleAdy();
+    ady.title = title;
+    ady.detectedChannels[0].customTargetCurvePoints = frequencyGrid().map((f) => `{${f.toFixed(1)}, ${db.toFixed(3)}}`);
+    return ady;
+  }
+  const gainsOf = (ady: ReturnType<typeof constant>) => byId(ady, 'FL').customTargetCurvePoints.map(gainOf);
+
+  it('adds the step to the correction already in the measured-with file', () => {
+    const result = applyMeasuredCorrection(constant(0), constant(1), new Map([['FL', () => 0.5]]), 3);
+    expect(gainsOf(result).every((g) => g === 1.5)).toBe(true);
+  });
+
+  it('caps the total distance from the target at the limit', () => {
+    const up = applyMeasuredCorrection(constant(0), constant(2.5), new Map([['FL', () => 1]]), 3);
+    expect(gainsOf(up).every((g) => g === 3)).toBe(true);
+    const down = applyMeasuredCorrection(constant(0), constant(-2.5), new Map([['FL', () => -1]]), 3);
+    expect(gainsOf(down).every((g) => g === -3)).toBe(true);
+    const lowered = applyMeasuredCorrection(constant(0), constant(2.5), new Map([['FL', () => 0]]), 2);
+    expect(gainsOf(lowered).every((g) => g === 2)).toBe(true);
+  });
+
+  it('measures the limit from the target, not from zero', () => {
+    const result = applyMeasuredCorrection(constant(-4), constant(-2), new Map([['FL', () => 1]]), 3);
+    expect(gainsOf(result).every((g) => g === -1)).toBe(true);
+  });
+
+  it('edits a copy of the measured-with file, keeping its other fields', () => {
+    const target = constant(0, 'Target');
+    const withFile = constant(1, 'Round 1');
+    byId(withFile, 'SW1').trimAdjustment = '2.000000';
+    const result = applyMeasuredCorrection(target, withFile, new Map([['FL', () => 0]]), 3);
+    expect(result.title).toBe('Round 1');
+    expect(byId(result, 'SW1')).toEqual(byId(withFile, 'SW1'));
+  });
+
+  it('refuses a corrected speaker with no curve in the target or in the measured-with file', () => {
+    const noTarget = () => applyMeasuredCorrection(createSampleAdy(), constant(0), new Map([['FL', trim]]), 3);
+    expect(noTarget).toThrow(/FL has no target curve/);
+    const noWith = () => applyMeasuredCorrection(constant(0), createSampleAdy(), new Map([['FL', trim]]), 3);
+    expect(noWith).toThrow('Channel FL has no curve in the file you measured with.');
+  });
+
+  it('refuses a limit that is not a positive number', () => {
+    const ady = constant(0);
+    expect(() => applyMeasuredCorrection(ady, ady, new Map([['FL', trim]]), 0)).toThrow(/Limit/);
+    expect(() => applyMeasuredCorrection(ady, ady, new Map([['FL', trim]]), NaN)).toThrow(/Limit/);
   });
 });

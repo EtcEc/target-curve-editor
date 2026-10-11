@@ -1,4 +1,5 @@
 import { frequencyGrid, writtenGain, computeTrimShift, type CurveParams, type TrimFn } from './curve';
+import { clampTotal } from './correction';
 import { readCurvePoints } from './curvePoints';
 import { interpLogFreq } from './logInterp';
 
@@ -100,27 +101,48 @@ export function applyCurveToAdy(ady: AdyFile, params: CurveParams): AdyFile {
 export class MeasuredCorrectionError extends Error {}
 
 /**
- * Returns a new AdyFile with a measured correction added to the curves already
- * in the file. Each non-sub channel that has a trim gets its existing curve,
- * resampled onto the write grid (log-frequency interpolation), plus the trim.
- * Everything else — other channels' points, every trimAdjustment,
- * enTargetCurveType, all other fields — is copied as is. Does not mutate the
- * input. Throws MeasuredCorrectionError for a trimmed channel with no curve.
+ * Returns a copy of `measuredWith` (the file the AVR was measured with; in
+ * round 1 the target file itself) with a measured correction applied. Each
+ * non-sub channel that has a trim gets, on the write grid,
+ * target + clamp(measuredWith - target + trim, +/- limitDb): the correction
+ * already in place plus this round's step, never further than the limit from
+ * the target. Both curves are resampled by log-frequency interpolation.
+ * Everything else (other channels' points, every trimAdjustment,
+ * enTargetCurveType, all other fields) is copied from `measuredWith` as is.
+ * Does not mutate the inputs. Throws MeasuredCorrectionError for a corrected
+ * channel without a curve in either file, or a limit that is not positive.
  */
-export function applyMeasuredCorrection(ady: AdyFile, trims: ReadonlyMap<string, TrimFn>): AdyFile {
-  const clone = JSON.parse(JSON.stringify(ady)) as AdyFile;
+export function applyMeasuredCorrection(
+  target: AdyFile,
+  measuredWith: AdyFile,
+  trims: ReadonlyMap<string, TrimFn>,
+  limitDb: number
+): AdyFile {
+  if (!(Number.isFinite(limitDb) && limitDb > 0)) {
+    throw new MeasuredCorrectionError(`Limit must be a positive number of dB, got ${limitDb}`);
+  }
+  const clone = JSON.parse(JSON.stringify(measuredWith)) as AdyFile;
   const grid = frequencyGrid();
   for (const channel of clone.detectedChannels) {
     if (isSubwooferChannel(channel)) continue;
     const trim = trims.get(channel.commandId);
     if (!trim) continue;
-    const { freqs, gains } = readCurvePoints(channel);
-    if (freqs.length === 0) {
+    const targetChannel = target.detectedChannels.find((c) => c.commandId === channel.commandId);
+    const goal = targetChannel ? readCurvePoints(targetChannel) : { freqs: [], gains: [] };
+    if (goal.freqs.length === 0) {
       throw new MeasuredCorrectionError(
         `Channel ${channel.commandId} has no target curve. Design one on the Design page first.`
       );
     }
-    channel.customTargetCurvePoints = grid.map((f) => formatPoint(f, interpLogFreq(freqs, gains, f) + trim(f)));
+    const current = readCurvePoints(channel);
+    if (current.freqs.length === 0) {
+      throw new MeasuredCorrectionError(`Channel ${channel.commandId} has no curve in the file you measured with.`);
+    }
+    channel.customTargetCurvePoints = grid.map((f) => {
+      const t = interpLogFreq(goal.freqs, goal.gains, f);
+      const soFar = interpLogFreq(current.freqs, current.gains, f) - t;
+      return formatPoint(f, t + clampTotal(soFar, trim(f), limitDb));
+    });
   }
   return clone;
 }

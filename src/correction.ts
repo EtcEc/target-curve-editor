@@ -102,6 +102,15 @@ export function trimFromError(
   return (f: number) => interpLogFreq(freq, trims, f);
 }
 
+/**
+ * The correction after this round: the correction already in place plus this
+ * round's step, capped at +/- the limit so no curve ends up further than that
+ * from the target, however many rounds it took.
+ */
+export function clampTotal(soFar: number, step: number, limitDb: number): number {
+  return Math.max(-limitDb, Math.min(limitDb, soFar + step));
+}
+
 /** One trim function per channel in the correction, for the given cutoff and options. */
 export function buildChannelTrims(
   correction: Correction,

@@ -336,7 +336,12 @@ dropzone.addEventListener('drop', (event) => {
 
 downloadButton.addEventListener('click', () => {
   if (!ady || !result) return;
-  const corrected = applyMeasuredCorrection(ady, buildChannelTrims(result.correction, cutoffHz, trimOptions));
+  const corrected = applyMeasuredCorrection(
+    ady,
+    ady,
+    buildChannelTrims(result.correction, cutoffHz, trimOptions),
+    trimOptions.limitDb
+  );
   const url = URL.createObjectURL(new Blob([serializeAdy(corrected)], { type: 'application/json' }));
   const a = document.createElement('a');
   a.href = url;
