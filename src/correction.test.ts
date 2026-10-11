@@ -23,18 +23,25 @@ const shelf = (v: number) => freq.map((f) => (f >= 1500 ? v : 0));
 const zeros = freq.map(() => 0);
 
 describe('cutoff constants', () => {
-  it('defaults to 500 Hz and allows 100-18000 Hz', () => {
-    expect(DEFAULT_CUTOFF_HZ).toBe(500);
-    expect(MIN_CUTOFF_HZ).toBe(100);
+  it('defaults to 0 (full range) and allows 0-18000 Hz', () => {
+    expect(DEFAULT_CUTOFF_HZ).toBe(0);
+    expect(MIN_CUTOFF_HZ).toBe(0);
     expect(MAX_CUTOFF_HZ).toBe(18000);
   });
 });
 
 describe('trimFromError', () => {
-  it('rejects a cutoff that is not a positive finite number', () => {
-    for (const bad of [0, -1, NaN, Infinity]) {
+  it('rejects a cutoff that is negative or not finite', () => {
+    for (const bad of [-1, NaN, Infinity]) {
       expect(() => trimFromError(shelf(1), freq, bad)).toThrow(/cutoff/i);
     }
+  });
+
+  it('corrects the full range with a cutoff of 0', () => {
+    // 2 dB below 150 Hz, 0 from there up: 0 around the 1 kHz pin, so the trim at 40 Hz is -2
+    const bass = freq.map((f) => (f < 150 ? 2 : 0));
+    expect(trimFromError(bass, freq, 0)(40)).toBeCloseTo(-2, 6);
+    expect(trimFromError(bass, freq, 500)(40)).toBeCloseTo(0, 6);
   });
 
   it('is zero below the fade, half at the cutoff and full above it', () => {

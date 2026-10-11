@@ -19,8 +19,9 @@ export interface ChannelCorrection {
 /** Measured errors per channel (commandId). Kept in memory only. */
 export type Correction = Record<string, ChannelCorrection>;
 
-export const DEFAULT_CUTOFF_HZ = 500;
-export const MIN_CUTOFF_HZ = 100;
+/** 0 means no cutoff: the correction applies over the full range. */
+export const DEFAULT_CUTOFF_HZ = 0;
+export const MIN_CUTOFF_HZ = 0;
 export const MAX_CUTOFF_HZ = 18000;
 
 /** The shared log grid has 24 points per octave. */
@@ -59,7 +60,7 @@ export function formatOctaves(octaves: number): string {
 /**
  * Turns a measured error curve into a trim: average over the detail width,
  * re-pin so the averaged error is 0 at 1 kHz (each curve keeps its value
- * there), scale by strength, clamp to +/- the limit, fade in around the cutoff,
+ * there), scale by strength, clamp to +/- the limit, fade in around the cutoff (no fade for a cutoff of 0),
  * negate. The returned function looks the trim up by log-frequency
  * interpolation between `freq` points.
  */
@@ -69,8 +70,8 @@ export function trimFromError(
   cutoffHz: number,
   options: TrimOptions = DEFAULT_TRIM_OPTIONS
 ): TrimFn {
-  if (!Number.isFinite(cutoffHz) || cutoffHz <= 0) {
-    throw new Error(`Cutoff must be a positive finite frequency, got ${cutoffHz}`);
+  if (!(Number.isFinite(cutoffHz) && cutoffHz >= 0)) {
+    throw new Error(`Cutoff must be 0 or a positive finite frequency, got ${cutoffHz}`);
   }
   const { detailOctaves, strength, limitDb } = options;
   if (!(Number.isFinite(detailOctaves) && detailOctaves > 0)) {
@@ -96,7 +97,7 @@ export function trimFromError(
   const pin = interpLogFreq(freq, smoothed, ANCHOR_HZ);
   const trims = smoothed.map((value, i) => {
     const clamped = Math.max(-limitDb, Math.min(limitDb, strength * (value - pin)));
-    const weight = smoothstep(Math.log2(freq[i] / cutoffHz) / FADE_WIDTH_OCTAVES + 0.5);
+    const weight = cutoffHz === 0 ? 1 : smoothstep(Math.log2(freq[i] / cutoffHz) / FADE_WIDTH_OCTAVES + 0.5);
     return -weight * clamped;
   });
   return (f: number) => interpLogFreq(freq, trims, f);

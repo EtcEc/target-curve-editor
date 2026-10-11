@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { parseAdy } from '../src/ady';
-import { DEFAULT_CUTOFF_HZ, buildChannelTrims } from '../src/correction';
+import { buildChannelTrims } from '../src/correction';
 import { measureCorrection } from '../src/generate';
 import { logGrid } from '../src/measuredError';
 
@@ -59,7 +59,7 @@ describe.skipIf(!adyPath || !dir)('local acceptance: real measurement session', 
 
   it('keeps every trim within +-3 dB, zero well below the cutoff and pinned at 1 kHz', () => {
     const { result } = load();
-    const trims = buildChannelTrims(result.correction, DEFAULT_CUTOFF_HZ);
+    const trims = buildChannelTrims(result.correction, 500);
     for (const trim of trims.values()) {
       for (const f of logGrid()) expect(Math.abs(trim(f))).toBeLessThanOrEqual(3 + 1e-9);
       expect(trim(200)).toBeCloseTo(0, 6);
