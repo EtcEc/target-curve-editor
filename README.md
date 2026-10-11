@@ -23,8 +23,8 @@ The start page offers two jobs:
    measurement, the curve you measured with and the new curve. The download is
    the measured-with file with each corrected curve set to your target plus the
    correction so far plus this round's step (lined up and pinned at 1 kHz,
-   fading in around the cutoff, never more than the limit from your target; sub
-   trim and channel levels untouched). Load it on the AVR, measure again, and
+   fading in around the cutoff if you set one, never more than the limit from
+   your target; channel levels untouched apart from the sub's, see below). Load it on the AVR, measure again, and
    repeat with it as the measured-with file.
    The sub is corrected too ("Correct the sub", on by default): what every
    measured speaker has in common in the bass is the sub playing, so that part

@@ -1,4 +1,5 @@
-import { isSubwooferChannel, type AdyFile } from './ady';
+import { isSubwooferChannel, type AdyChannel, type AdyFile } from './ady';
+import { TargetParseError } from './curvePoints';
 import {
   DEFAULT_TRIM_OPTIONS,
   changeExtent,
@@ -49,8 +50,18 @@ export function commonError(correction: Correction): number[] {
   return errors[0].map((_, i) => errors.reduce((sum, e) => sum + e[i], 0) / errors.length);
 }
 
+/** Both channels' written curves on the log grid, or null when either can't be read (the sub is then left alone). */
+function readableCurves(target: AdyChannel, measuredWith: AdyChannel): [number[], number[]] | null {
+  try {
+    return [writtenCurve(target), writtenCurve(measuredWith)];
+  } catch (err) {
+    if (err instanceof TargetParseError) return null;
+    throw err;
+  }
+}
+
 /**
- * One SubCorrection per sub channel with a curve in both files, all sharing
+ * One SubCorrection per sub channel with a readable curve in both files, all sharing
  * the speakers' common error. Empty when no speaker was measured.
  */
 export function buildSubCorrections(
@@ -67,8 +78,9 @@ export function buildSubCorrections(
     if (!isSubwooferChannel(channel) || channel.customTargetCurvePoints.length === 0) continue;
     const withChannel = measuredWith.detectedChannels.find((c) => c.commandId === channel.commandId);
     if (!withChannel || withChannel.customTargetCurvePoints.length === 0) continue;
-    const targetCurve = writtenCurve(channel);
-    const withCurve = writtenCurve(withChannel);
+    const curves = readableCurves(channel, withChannel);
+    if (!curves) continue;
+    const [targetCurve, withCurve] = curves;
     subs.push({
       commandId: channel.commandId,
       fromSpeakers: speakers.length,

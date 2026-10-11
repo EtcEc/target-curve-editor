@@ -91,6 +91,13 @@ describe('buildSubCorrections', () => {
     expect(sub.soFar[grid.findIndex((f) => f >= 1000)]).toBeCloseTo(0, 6);
   });
 
+  it('skips a sub whose curve points cannot be read', () => {
+    const broken = ady();
+    broken.detectedChannels[1].customTargetCurvePoints = ['{nonsense}'];
+    expect(buildSubCorrections(broken, ady(), correction)).toEqual([]);
+    expect(buildSubCorrections(ady(), broken, correction)).toEqual([]);
+  });
+
   it('skips a sub without a curve in either file, and needs a measured speaker', () => {
     const noCurve = ady();
     noCurve.detectedChannels[1].customTargetCurvePoints = [];
