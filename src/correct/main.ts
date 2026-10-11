@@ -216,7 +216,7 @@ async function recompute(): Promise<void> {
       result = null;
       show(measureError, null);
     } else {
-      result = measureCorrection(current, speakers);
+      result = measureCorrection(current, current, speakers);
       show(measureError, null);
     }
   } catch (err) {

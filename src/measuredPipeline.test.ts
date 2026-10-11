@@ -27,7 +27,7 @@ describe('measured-correction pipeline, end to end', () => {
     const target = effectiveTarget(fl, 2);
     const text = synthRewText((f) => 70 + interpLogFreq(grid, target, f));
 
-    const { correction } = measureCorrection(designed, [{ commandId: 'FL', files: [{ name: 'L.txt', text }] }]);
+    const { correction } = measureCorrection(designed, designed, [{ commandId: 'FL', files: [{ name: 'L.txt', text }] }]);
     const corrected = applyMeasuredCorrection(designed, buildChannelTrims(correction, 500));
 
     const before = readCurvePoints(fl);

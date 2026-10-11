@@ -98,7 +98,7 @@ export function rmsOver(curve: readonly number[], loHz: number, hiHz: number): n
 }
 
 /** The channel's written curve (dB) on the grid; all zeros when it has no custom points. */
-function writtenCurve(channel: AdyChannel): number[] {
+export function writtenCurve(channel: AdyChannel): number[] {
   const grid = logGrid();
   const { freqs, gains } = readCurvePoints(channel);
   if (freqs.length === 0) return grid.map(() => 0);

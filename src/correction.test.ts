@@ -18,6 +18,7 @@ import { logGrid } from './measuredError';
 const freq = logGrid();
 /** 0 up to 1.5 kHz and `v` above: zero around the 1 kHz pin, so above the fade the trim is exactly -v. */
 const shelf = (v: number) => freq.map((f) => (f >= 1500 ? v : 0));
+const zeros = freq.map(() => 0);
 
 describe('cutoff constants', () => {
   it('defaults to 500 Hz and allows 100-18000 Hz', () => {
@@ -98,8 +99,8 @@ describe('trimFromError', () => {
 
 describe('buildChannelTrims / summarizeCorrection', () => {
   const correction: Correction = {
-    FL: { positions: 3, error: shelf(2) },
-    FR: { positions: 2, error: shelf(-1) },
+    FL: { positions: 3, error: shelf(2), soFar: zeros },
+    FR: { positions: 2, error: shelf(-1), soFar: zeros },
   };
 
   it('builds one trim function per channel', () => {
@@ -177,7 +178,7 @@ describe('trim options', () => {
   });
 
   it('passes the options through buildChannelTrims and summarizeCorrection', () => {
-    const correction: Correction = { FL: { positions: 1, error: shelf(2) } };
+    const correction: Correction = { FL: { positions: 1, error: shelf(2), soFar: zeros } };
     const options = { ...DEFAULT_TRIM_OPTIONS, limitDb: 1 };
     expect(buildChannelTrims(correction, 4000, options).get('FL')!(10000)).toBeCloseTo(-1, 6);
     expect(summarizeCorrection(correction, 4000, options)[0].maxAbsTrim).toBeCloseTo(1, 6);

@@ -35,7 +35,7 @@ function load() {
         .map((name) => ({ name, text: readFileSync(join(dir as string, name), 'utf8') })),
     }))
     .filter((s) => s.files.length > 0 && ady.detectedChannels.some((c) => c.commandId === s.commandId));
-  return { speakers, result: measureCorrection(ady, speakers) };
+  return { speakers, result: measureCorrection(ady, ady, speakers) };
 }
 
 describe.skipIf(!adyPath || !dir)('local acceptance: real measurement session', () => {

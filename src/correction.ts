@@ -8,6 +8,12 @@ export interface ChannelCorrection {
   positions: number;
   /** measured - target (dB) at each grid point, lined up at 1 kHz. */
   error: number[];
+  /**
+   * The correction already in place: the measured-with file's curve minus the
+   * target's (dB) at each grid point, not level-normalised. All zeros when the
+   * target file was also the file measured with.
+   */
+  soFar: number[];
 }
 
 /** Measured errors per channel (commandId). Kept in memory only. */

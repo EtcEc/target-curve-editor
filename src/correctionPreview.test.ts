@@ -11,10 +11,11 @@ const channel = () => {
   return c;
 };
 const error = grid.map((f) => (f >= 1500 ? 2 : 0));
+const soFar = grid.map(() => 0);
 
 describe('previewCurves', () => {
   it('shows the current target, the measurement and the corrected target on the log grid', () => {
-    const curves = previewCurves(channel(), 2, { positions: 1, error }, 500);
+    const curves = previewCurves(channel(), 2, { positions: 1, error, soFar }, 500);
     const target = effectiveTarget(channel(), 2);
     const trim = trimFromError(error, grid, 500);
     expect(curves.freq).toEqual(grid);
@@ -24,14 +25,14 @@ describe('previewCurves', () => {
   });
 
   it('leaves the target alone below the fade', () => {
-    const curves = previewCurves(channel(), 2, { positions: 1, error }, 4000);
+    const curves = previewCurves(channel(), 2, { positions: 1, error, soFar }, 4000);
     const i = grid.findIndex((f) => f >= 1000);
     expect(curves.corrected[i]).toBeCloseTo(curves.current[i], 9);
   });
 
   it('uses the trim options for the corrected line', () => {
     const options = { ...DEFAULT_TRIM_OPTIONS, strength: 0.5, limitDb: 0.5 };
-    const curves = previewCurves(channel(), 2, { positions: 1, error }, 500, options);
+    const curves = previewCurves(channel(), 2, { positions: 1, error, soFar }, 500, options);
     const trim = trimFromError(error, grid, 500, options);
     curves.corrected.forEach((v, i) => expect(v).toBeCloseTo(curves.current[i] + trim(grid[i]), 9));
   });
