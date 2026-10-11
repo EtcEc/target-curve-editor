@@ -135,6 +135,23 @@ export interface TrimSummaryRow {
   maxTotal: number;
 }
 
+/** The largest change from the measured-with curve and the largest distance from the target, for one channel. */
+export function changeExtent(
+  soFar: readonly number[],
+  step: TrimFn,
+  freq: readonly number[],
+  limitDb: number
+): { maxThisRound: number; maxTotal: number } {
+  let maxThisRound = 0;
+  let maxTotal = 0;
+  freq.forEach((f, i) => {
+    const total = clampTotal(soFar[i], step(f), limitDb);
+    maxTotal = Math.max(maxTotal, Math.abs(total));
+    maxThisRound = Math.max(maxThisRound, Math.abs(total - soFar[i]));
+  });
+  return { maxThisRound, maxTotal };
+}
+
 export function summarizeCorrection(
   correction: Correction,
   cutoffHz: number,
@@ -143,14 +160,7 @@ export function summarizeCorrection(
   const freq = logGrid();
   return Object.entries(correction).map(([commandId, channel]) => {
     const trim = trimFromError(channel.error, freq, cutoffHz, options);
-    let maxThisRound = 0;
-    let maxTotal = 0;
-    freq.forEach((f, i) => {
-      const total = clampTotal(channel.soFar[i], trim(f), options.limitDb);
-      maxTotal = Math.max(maxTotal, Math.abs(total));
-      maxThisRound = Math.max(maxThisRound, Math.abs(total - channel.soFar[i]));
-    });
-    return { commandId, positions: channel.positions, maxThisRound, maxTotal };
+    return { commandId, positions: channel.positions, ...changeExtent(channel.soFar, trim, freq, options.limitDb) };
   });
 }
 
