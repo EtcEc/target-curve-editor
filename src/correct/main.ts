@@ -76,6 +76,8 @@ let target: AdyFile | null = null;
 /** The file the AVR was measured with, from round 2 on; null means the target itself. */
 let measuredWith: AdyFile | null = null;
 let measuredWithName = '';
+/** A measured-with file was chosen but could not be loaded. */
+let withFailed = false;
 let rolloffType: RolloffType = 2;
 /** True when a target is loaded and it fits the measured-with file. */
 let paired = false;
@@ -182,11 +184,13 @@ async function loadMeasuredWith(file: File): Promise<void> {
     if (mine !== withLoads) return;
     measuredWith = parsed;
     measuredWithName = file.name;
+    withFailed = false;
     show(withError, null);
   } catch (err) {
     if (mine !== withLoads) return;
     measuredWith = null;
     measuredWithName = '';
+    withFailed = true;
     show(withError, (err as Error).message);
   }
   withClear.hidden = false;
@@ -197,6 +201,7 @@ function clearMeasuredWith(): void {
   withLoads++;
   measuredWith = null;
   measuredWithName = '';
+  withFailed = false;
   withInput.value = '';
   showFileName('with-input', 'No file chosen');
   show(withError, null);
@@ -210,7 +215,7 @@ function refresh(): void {
   paired = false;
   show(pairError, null);
   const other = base();
-  if (target && other) {
+  if (target && other && !withFailed) {
     try {
       rolloffType = checkFilePair(target, other);
       paired = true;
