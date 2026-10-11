@@ -60,26 +60,36 @@ export function buildFilenameSuffix(params: CurveParams): string {
   return (params.cancelRolloff ? '' : '_no-knee-cancel') + (params.subTrim ? '' : '_no-sub-trim');
 }
 
-/** What the Correct page's download will contain. */
+/** What the Correct page's download will contain. `measuredWith` is set from round 2 on. */
 export function correctChecklist(
   channels: readonly string[],
   cutoffHz: number,
-  options: TrimOptions = DEFAULT_TRIM_OPTIONS
+  options: TrimOptions = DEFAULT_TRIM_OPTIONS,
+  measuredWith?: { name: string; soFarDb: number }
 ): ChecklistItem[] {
   const lo = Math.round(cutoffHz / Math.SQRT2);
   const hi = Math.round(cutoffHz * Math.SQRT2);
-  return [
+  const items: ChecklistItem[] = [
     {
       text: `Measured correction on ${channels.join(', ')}, fading in from ${lo} Hz to ${hi} Hz (cutoff ${cutoffHz} Hz)`,
       on: true,
     },
+  ];
+  if (measuredWith) {
+    items.push({
+      text: `Measured with: ${measuredWith.name} (correction so far up to ${measuredWith.soFarDb.toFixed(1)} dB)`,
+      on: true,
+    });
+  }
+  items.push(
     {
       text: `Detail ${formatOctaves(options.detailOctaves)} oct · strength ${Math.round(options.strength * 100)}% · limit ±${options.limitDb} dB`,
       on: true,
     },
     { text: 'Unchanged below the fade; each curve keeps its level at 1 kHz', on: true },
-    { text: 'Sub, channel levels and HF rolloff unchanged', on: true },
-  ];
+    { text: 'Sub, channel levels and HF rolloff unchanged', on: true }
+  );
+  return items;
 }
 
 /** Download name for a corrected file, e.g. "Living_measured-500Hz.ady". */

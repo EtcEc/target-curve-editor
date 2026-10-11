@@ -5,6 +5,7 @@ import {
   MIN_CUTOFF_HZ,
   buildChannelTrims,
   clampTotal,
+  maxSoFar,
   summarizeCorrection,
   trimFromError,
   DEFAULT_TRIM_OPTIONS,
@@ -111,16 +112,25 @@ describe('buildChannelTrims / summarizeCorrection', () => {
     expect(trims.get('FR')!(10000)).toBeCloseTo(1, 6);
   });
 
-  it('summarises positions and the largest trim per channel', () => {
+  it('summarises positions and the largest change per channel; with nothing so far both columns agree', () => {
     const fl = summarizeCorrection(correction, 4000).find((r) => r.commandId === 'FL')!;
     expect(fl.positions).toBe(3);
-    expect(fl.maxAbsTrim).toBeCloseTo(2, 6);
+    expect(fl.maxThisRound).toBeCloseTo(2, 6);
+    expect(fl.maxTotal).toBeCloseTo(2, 6);
   });
 
-  it('reports a smaller largest trim for a higher cutoff', () => {
-    const low = summarizeCorrection(correction, 4000)[0].maxAbsTrim;
-    const none = summarizeCorrection(correction, 60000)[0].maxAbsTrim;
+  it('reports a smaller largest change for a higher cutoff', () => {
+    const low = summarizeCorrection(correction, 4000)[0].maxThisRound;
+    const none = summarizeCorrection(correction, 60000)[0].maxThisRound;
     expect(low).toBeGreaterThan(none);
+  });
+
+  it('separates this round from the total, capping the total at the limit', () => {
+    const soFar = freq.map(() => 2.5);
+    const row = summarizeCorrection({ FL: { positions: 1, error: shelf(-1), soFar } }, 4000)[0];
+    // above the fade: 2.5 + 1 capped at 3, so this round only adds 0.5
+    expect(row.maxTotal).toBeCloseTo(3, 6);
+    expect(row.maxThisRound).toBeCloseTo(0.5, 6);
   });
 });
 
@@ -182,7 +192,7 @@ describe('trim options', () => {
     const correction: Correction = { FL: { positions: 1, error: shelf(2), soFar: zeros } };
     const options = { ...DEFAULT_TRIM_OPTIONS, limitDb: 1 };
     expect(buildChannelTrims(correction, 4000, options).get('FL')!(10000)).toBeCloseTo(-1, 6);
-    expect(summarizeCorrection(correction, 4000, options)[0].maxAbsTrim).toBeCloseTo(1, 6);
+    expect(summarizeCorrection(correction, 4000, options)[0].maxThisRound).toBeCloseTo(1, 6);
   });
 
   it('formats detail widths as short fractions', () => {
@@ -197,5 +207,13 @@ describe('clampTotal', () => {
     expect(clampTotal(-2.5, -1, 3)).toBe(-3);
     expect(clampTotal(2.5, 0, 2)).toBe(2);
     expect(clampTotal(2.5, -1, 3)).toBe(1.5);
+  });
+});
+
+describe('maxSoFar', () => {
+  it('is the largest correction already in place over all channels', () => {
+    const soFar = freq.map((f) => (f >= 5000 ? -2.1 : 0.4));
+    expect(maxSoFar({ FL: { positions: 1, error: zeros, soFar: zeros }, FR: { positions: 1, error: zeros, soFar } })).toBeCloseTo(2.1, 9);
+    expect(maxSoFar({})).toBe(0);
   });
 });

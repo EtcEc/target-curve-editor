@@ -14,26 +14,36 @@ const error = grid.map((f) => (f >= 1500 ? 2 : 0));
 const soFar = grid.map(() => 0);
 
 describe('previewCurves', () => {
-  it('shows the current target, the measurement and the corrected target on the log grid', () => {
+  it('shows the target, the measurement, the measured-with curve and the new curve on the log grid', () => {
     const curves = previewCurves(channel(), 2, { positions: 1, error, soFar }, 500);
     const target = effectiveTarget(channel(), 2);
     const trim = trimFromError(error, grid, 500);
     expect(curves.freq).toEqual(grid);
-    curves.current.forEach((v, i) => expect(v).toBeCloseTo(target[i], 9));
+    curves.target.forEach((v, i) => expect(v).toBeCloseTo(target[i], 9));
     curves.measured.forEach((v, i) => expect(v).toBeCloseTo(target[i] + error[i], 9));
+    curves.measuredWith.forEach((v, i) => expect(v).toBeCloseTo(target[i], 9));
     curves.corrected.forEach((v, i) => expect(v).toBeCloseTo(target[i] + trim(grid[i]), 9));
   });
 
   it('leaves the target alone below the fade', () => {
     const curves = previewCurves(channel(), 2, { positions: 1, error, soFar }, 4000);
     const i = grid.findIndex((f) => f >= 1000);
-    expect(curves.corrected[i]).toBeCloseTo(curves.current[i], 9);
+    expect(curves.corrected[i]).toBeCloseTo(curves.target[i], 9);
   });
 
-  it('uses the trim options for the corrected line', () => {
+  it('uses the trim options for the new curve', () => {
     const options = { ...DEFAULT_TRIM_OPTIONS, strength: 0.5, limitDb: 0.5 };
     const curves = previewCurves(channel(), 2, { positions: 1, error, soFar }, 500, options);
     const trim = trimFromError(error, grid, 500, options);
-    curves.corrected.forEach((v, i) => expect(v).toBeCloseTo(curves.current[i] + trim(grid[i]), 9));
+    curves.corrected.forEach((v, i) => expect(v).toBeCloseTo(curves.target[i] + trim(grid[i]), 9));
+  });
+
+  it('builds on the correction so far and caps the total at the limit', () => {
+    const before = grid.map(() => -2.5);
+    const curves = previewCurves(channel(), 2, { positions: 1, error, soFar: before }, 500);
+    const i = grid.findIndex((f) => f >= 8000);
+    expect(curves.measuredWith[i]).toBeCloseTo(curves.target[i] - 2.5, 9);
+    // -2.5 so far plus a -2 step, capped at -3
+    expect(curves.corrected[i]).toBeCloseTo(curves.target[i] - 3, 9);
   });
 });

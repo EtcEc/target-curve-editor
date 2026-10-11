@@ -239,7 +239,7 @@ function renderTable(): void {
   }
   const trims = summarizeCorrection(result.correction, cutoffHz, trimOptions);
   for (const report of result.reports) {
-    const largest = trims.find((t) => t.commandId === report.commandId)?.maxAbsTrim ?? 0;
+    const largest = trims.find((t) => t.commandId === report.commandId)?.maxThisRound ?? 0;
     const tr = document.createElement('tr');
     tr.append(
       cell(report.commandId),
@@ -270,11 +270,11 @@ function renderPreview(): void {
   previewHint.hidden = ids.length > 0;
   const channel = keep ? ady.detectedChannels.find((c) => c.commandId === keep) : undefined;
   if (!result || !keep || !channel) {
-    updatePreviewChart(chart, null);
+    updatePreviewChart(chart, null, false);
     return;
   }
   previewChannel.value = keep;
-  updatePreviewChart(chart, previewCurves(channel, rolloffType, result.correction[keep], cutoffHz, trimOptions));
+  updatePreviewChart(chart, previewCurves(channel, rolloffType, result.correction[keep], cutoffHz, trimOptions), false);
 }
 
 function render(): void {

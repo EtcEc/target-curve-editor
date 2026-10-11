@@ -128,7 +128,10 @@ export function buildChannelTrims(
 export interface TrimSummaryRow {
   commandId: string;
   positions: number;
-  maxAbsTrim: number;
+  /** Largest change (dB) from the curve the AVR was measured with. */
+  maxThisRound: number;
+  /** Largest distance (dB) of the new curve from the target. */
+  maxTotal: number;
 }
 
 export function summarizeCorrection(
@@ -139,8 +142,22 @@ export function summarizeCorrection(
   const freq = logGrid();
   return Object.entries(correction).map(([commandId, channel]) => {
     const trim = trimFromError(channel.error, freq, cutoffHz, options);
-    let maxAbsTrim = 0;
-    for (const f of freq) maxAbsTrim = Math.max(maxAbsTrim, Math.abs(trim(f)));
-    return { commandId, positions: channel.positions, maxAbsTrim };
+    let maxThisRound = 0;
+    let maxTotal = 0;
+    freq.forEach((f, i) => {
+      const total = clampTotal(channel.soFar[i], trim(f), options.limitDb);
+      maxTotal = Math.max(maxTotal, Math.abs(total));
+      maxThisRound = Math.max(maxThisRound, Math.abs(total - channel.soFar[i]));
+    });
+    return { commandId, positions: channel.positions, maxThisRound, maxTotal };
   });
+}
+
+/** The largest correction already in place (dB) over every channel. */
+export function maxSoFar(correction: Correction): number {
+  let max = 0;
+  for (const channel of Object.values(correction)) {
+    for (const v of channel.soFar) max = Math.max(max, Math.abs(v));
+  }
+  return max;
 }

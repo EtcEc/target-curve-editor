@@ -1,19 +1,27 @@
 import type { AdyChannel } from './ady';
-import { trimFromError, type ChannelCorrection, type TrimOptions, DEFAULT_TRIM_OPTIONS } from './correction';
+import {
+  clampTotal,
+  trimFromError,
+  type ChannelCorrection,
+  type TrimOptions,
+  DEFAULT_TRIM_OPTIONS,
+} from './correction';
 import { effectiveTarget, logGrid } from './measuredError';
 import type { RolloffType } from './rolloff';
 
 export interface PreviewCurves {
   freq: number[];
-  /** What the file aims for now: its curve plus the HF rolloff. */
-  current: number[];
+  /** What you are aiming for: the target file's curve plus the HF rolloff. */
+  target: number[];
   /** The measured response. */
   measured: number[];
-  /** The target after the correction. */
+  /** What the AVR was aiming for during the measurement: the target plus the correction so far. */
+  measuredWith: number[];
+  /** The curve the download writes: the target plus the capped total correction. */
   corrected: number[];
 }
 
-/** The Correct page chart's three lines for one channel, all lined up at 1 kHz. */
+/** The Correct page chart's lines for one channel (`channel` is the target file's), all lined up at 1 kHz. */
 export function previewCurves(
   channel: AdyChannel,
   rolloffType: RolloffType,
@@ -22,12 +30,13 @@ export function previewCurves(
   options: TrimOptions = DEFAULT_TRIM_OPTIONS
 ): PreviewCurves {
   const freq = logGrid();
-  const current = effectiveTarget(channel, rolloffType);
+  const target = effectiveTarget(channel, rolloffType);
   const trim = trimFromError(correction.error, freq, cutoffHz, options);
   return {
     freq,
-    current,
-    measured: current.map((v, i) => v + correction.error[i]),
-    corrected: current.map((v, i) => v + trim(freq[i])),
+    target,
+    measured: target.map((v, i) => v + correction.error[i]),
+    measuredWith: target.map((v, i) => v + correction.soFar[i]),
+    corrected: target.map((v, i) => v + clampTotal(correction.soFar[i], trim(freq[i]), options.limitDb)),
   };
 }

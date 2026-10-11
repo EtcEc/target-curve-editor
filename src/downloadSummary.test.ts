@@ -85,6 +85,15 @@ describe('correctChecklist', () => {
     const options = { ...DEFAULT_TRIM_OPTIONS, detailOctaves: 1 / 3, strength: 0.7, limitDb: 4.5 };
     expect(correctChecklist(['FL'], 500, options)[1].text).toBe('Detail ⅓ oct · strength 70% · limit ±4.5 dB');
   });
+
+  it('adds a line naming the measured-with file and the correction so far', () => {
+    const items = correctChecklist(['FL'], 500, DEFAULT_TRIM_OPTIONS, { name: 'Living_measured-500Hz.ady', soFarDb: 2.14 });
+    expect(items[1]).toEqual({
+      text: 'Measured with: Living_measured-500Hz.ady (correction so far up to 2.1 dB)',
+      on: true,
+    });
+    expect(items).toHaveLength(5);
+  });
 });
 
 describe('measuredFilename', () => {
